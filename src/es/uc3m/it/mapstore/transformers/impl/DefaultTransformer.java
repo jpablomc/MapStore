@@ -21,8 +21,9 @@ import java.util.logging.Logger;
  *
  * @author Pablo
  */
-public class DefaultTransformer implements MapStoreTransformer{
+public class DefaultTransformer implements MapStoreTransformer<Object>{
 
+    @Override
     public MapStoreItem toStore(Object object) throws UnTransformableException {
         MapStoreItem item = new MapStoreItem();
         //Recuperamos los atributos
@@ -73,6 +74,7 @@ public class DefaultTransformer implements MapStoreTransformer{
         return item;
     }
 
+    @Override
     public Object toObject(MapStoreItem item) {
         return item;
     }

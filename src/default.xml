@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+    Document   : default.xml
+    Author     : Pablo
+    Description:
+        Defines the default configuration for MapStore
+-->
+
+<mapstore>
+    <transaction>
+        <transaction_manager>
+            <factory_class>es.uc3m.it.mapstore.db.transaction.impl.NeoTransactionManagerWrapper</factory_class>
+            <props>
+                
+            </props>
+        </transaction_manager>
+        <xa>
+            <factory>es.uc3m.it.mapstore.db.transaction.xa.impl.DerbyResourceManagerWrapper</factory>
+            <type>Numerical</type>
+            <name>Derby</name>
+            <prop>
+                <dialect>es.uc3m.it.mapstore.db.dialect.DerbyDialect</dialect>
+            </prop>
+        </xa>
+        <xa>
+            <factory>es.uc3m.it.mapstore.db.transaction.xa.impl.lucene.LuceneResourceManagerWrapper</factory>
+            <type>FullText</type>
+            <name>Lucene</name>
+            <prop></prop>
+        </xa>
+
+        <xa>
+            <factory>es.uc3m.it.mapstore.db.transaction.xa.impl.neo.NeoResourceManagerWrapper</factory>
+            <type>Relationship</type>
+            <name>Neo</name>
+            <prop></prop>
+        </xa>
+        <persistance>
+            <factory></factory>
+        </persistance>
+    </transaction>
+    <types>
+        <type>
+            <class>java.lang.String</class>
+            <resource_type>FullText</resource_type>
+        </type>
+        <type>
+            <class>java.lang.Byte</class>
+            <resource_type>Numerical</resource_type>
+        </type>
+        <type>
+            <class>java.lang.Character</class>
+            <resource_type>Numerical</resource_type>
+        </type>
+        <type>
+            <class>java.lang.Integer</class>
+            <resource_type>Numerical</resource_type>
+        </type>
+        <type>
+            <class>java.lang.Long</class>
+            <resource_type>Numerical</resource_type>
+        </type>
+        <type>
+            <class>java.lang.Double</class>
+            <resource_type>Numerical</resource_type>
+        </type>
+        <type>
+            <class>java.lang.Float</class>
+            <resource_type>Numerical</resource_type>
+        </type>
+        <type>
+            <class>java.util.Date</class>
+            <resource_type>Numerical</resource_type>
+        </type>
+
+        <default>
+            <resource_type>Relationship</resource_type>
+        </default>
+    </types>
+    <transformer_factory>es.uc3m.it.mapstore.transformers.factory.impl.DefaultTransformerFactory</transformer_factory>
+</mapstore>

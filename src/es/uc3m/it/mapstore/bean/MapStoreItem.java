@@ -5,6 +5,7 @@
 
 package es.uc3m.it.mapstore.bean;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -14,7 +15,7 @@ import java.util.Map;
  *
  * @author Pablo
  */
-public class MapStoreItem {
+public class MapStoreItem implements Serializable{
     public final static String NAME = "_NAME";
     public final static String ID = "_ID";
     public final static String TYPE = "_TYPE";
@@ -63,7 +64,7 @@ public class MapStoreItem {
      * 
      * @return
      */
-    public long getId() {
+    public Long getId() {
         return (Long)properties.get(ID);
     }
     /**

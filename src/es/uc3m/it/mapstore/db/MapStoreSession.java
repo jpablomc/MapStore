@@ -5,10 +5,13 @@
 
 package es.uc3m.it.mapstore.db;
 
+import javax.transaction.Transaction;
+
 /**
  *
  * @author Pablo
  */
 public interface MapStoreSession {
-    public Transaction beginTransaction();
+    public void beginTransaction();
+    
 }
