@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -93,7 +93,7 @@ public class NeoStoreXaDataSource extends XaDataSource
      * @throws IOException
      *             If unable to create data source
      */
-    public NeoStoreXaDataSource( Map<?,?> params ) throws IOException,
+    public NeoStoreXaDataSource( Map<Object,Object> params ) throws IOException,
         InstantiationException
     {
         super( params );
@@ -136,7 +136,7 @@ public class NeoStoreXaDataSource extends XaDataSource
 
         neoStore = new NeoStore( config );
         xaContainer = XaContainer.create( (String) config.get( "logical_log" ),
-            new CommandFactory( neoStore ), new TransactionFactory() );
+            new CommandFactory( neoStore ), new TransactionFactory(), params );
 
         xaContainer.openLogicalLog();
         if ( !xaContainer.getResourceManager().hasRecoveredTransactions() )
@@ -197,7 +197,7 @@ public class NeoStoreXaDataSource extends XaDataSource
         storeDir = logicalLogPath;
         neoStore = new NeoStore( neoStoreFileName );
         xaContainer = XaContainer.create( logicalLogPath, new CommandFactory(
-            neoStore ), new TransactionFactory() );
+            neoStore ), new TransactionFactory(), null );
 
         xaContainer.openLogicalLog();
         if ( !xaContainer.getResourceManager().hasRecoveredTransactions() )
@@ -332,7 +332,7 @@ public class NeoStoreXaDataSource extends XaDataSource
         return store.nextId();
     }
 
-    public int getHighestPossibleIdInUse( Class<?> clazz )
+    public long getHighestPossibleIdInUse( Class<?> clazz )
     {
         Store store = idGenerators.get( clazz );
         if ( store == null )
@@ -343,7 +343,7 @@ public class NeoStoreXaDataSource extends XaDataSource
         return store.getHighestPossibleIdInUse();
     }
 
-    public int getNumberOfIdsInUse( Class<?> clazz )
+    public long getNumberOfIdsInUse( Class<?> clazz )
     {
         Store store = idGenerators.get( clazz );
         if ( store == null )
@@ -441,5 +441,10 @@ public class NeoStoreXaDataSource extends XaDataSource
     public void makeBackupSlave()
     {
         xaContainer.getLogicalLog().makeBackupSlave();
+    }
+    
+    NeoReadTransaction getReadOnlyTransaction()
+    {
+        return new NeoReadTransaction( neoStore );
     }
 }

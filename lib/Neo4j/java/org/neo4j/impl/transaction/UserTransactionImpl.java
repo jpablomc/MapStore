@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -27,21 +27,22 @@ import javax.transaction.SystemException;
 import javax.transaction.TransactionManager;
 import javax.transaction.UserTransaction;
 
+import org.neo4j.api.core.EmbeddedNeo;
+import org.neo4j.api.core.NeoService;
+
 public class UserTransactionImpl implements UserTransaction
 {
-    private static final UserTransactionImpl instance = new UserTransactionImpl();
-
-    static TransactionManager tm = null;
-
-    public static UserTransactionImpl getInstance()
-    {
-        return instance;
-    }
-
-    private UserTransactionImpl()
+    private TransactionManager tm;
+    
+    public UserTransactionImpl()
     {
     }
-
+    
+    public UserTransactionImpl( NeoService neo )
+    {
+        this.tm = ((EmbeddedNeo) neo).getConfig().getTxModule().getTxManager();
+    }
+    
     public void begin() throws NotSupportedException, SystemException
     {
         tm.begin();
@@ -93,5 +94,15 @@ public class UserTransactionImpl implements UserTransaction
         {
         }
         return null;
+    }
+
+    public void setTransactionManager( TransactionManager tm )
+    {
+        this.tm = tm;
+    }
+
+    public TransactionManager getTransactionManager()
+    {
+        return tm;
     }
 }

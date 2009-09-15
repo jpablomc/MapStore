@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -65,6 +65,11 @@ class MappedPersistenceWindow extends LockableWindow
     {
         return buffer;
     }
+    
+    public int getRecordSize()
+    {
+        return recordSize;
+    }
 
     public long position()
     {
@@ -122,5 +127,13 @@ class MappedPersistenceWindow extends LockableWindow
     public void close()
     {
         buffer.close();
+    }
+
+    public Buffer getOffsettedBuffer( int id )
+    {
+        int offset = (int) ((id & 0xFFFFFFFFL) - 
+            buffer.position()) * recordSize;
+        buffer.setOffset( offset );
+        return buffer;
     }
 }

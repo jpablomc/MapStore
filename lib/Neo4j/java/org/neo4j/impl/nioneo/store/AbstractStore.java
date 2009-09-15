@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -124,8 +124,10 @@ public abstract class AbstractStore extends CommonAbstractStore
             getFileChannel().read( buffer );
             if ( !expectedVersion.equals( new String( version ) ) )
             {
-                versionFound( new String( version ) );
-                setStoreNotOk();
+                if ( !versionFound( new String( version ) ) )
+                {
+                    setStoreNotOk();
+                }
             }
             if ( getRecordSize() != 0
                 && (fileSize - version.length) % getRecordSize() != 0 )
@@ -151,17 +153,8 @@ public abstract class AbstractStore extends CommonAbstractStore
             setStoreNotOk();
         }
         setWindowPool( new PersistenceWindowPool( getStorageFileName(),
-            getRecordSize(), getFileChannel(), getMappedMem() ) );
-    }
-
-    /**
-     * Returns the next free id from {@link IdGenerator} used by this storage.
-     * 
-     * @return The id generator for this storage
-     */
-    public int nextId()
-    {
-        return super.nextId();
+            getRecordSize(), getFileChannel(), getMappedMem(), 
+            getIfMemoryMapped() ) );
     }
 
     /**
@@ -169,7 +162,7 @@ public abstract class AbstractStore extends CommonAbstractStore
      * 
      * @return The highest id in use
      */
-    public int getHighId()
+    public long getHighId()
     {
         return super.getHighId();
     }
@@ -183,18 +176,6 @@ public abstract class AbstractStore extends CommonAbstractStore
     public void setHighId( int id )
     {
         super.setHighId( id );
-    }
-
-    /**
-     * Makes a id previously acquired from <CODE>nextId()</CODE> method
-     * available again.
-     * 
-     * @param id
-     *            The id to free
-     */
-    public void freeId( int id )
-    {
-        super.freeId( id );
     }
 
     /**
@@ -221,7 +202,7 @@ public abstract class AbstractStore extends CommonAbstractStore
         IdGenerator.createGenerator( getStorageFileName() + ".id" );
         openIdGenerator();
         FileChannel fileChannel = getFileChannel();
-        int highId = 1;
+        long highId = 1;
         long defraggedCount = 0;
         try
         {
@@ -243,7 +224,7 @@ public abstract class AbstractStore extends CommonAbstractStore
                 }
                 else
                 {
-                    highId = (int) i;
+                    highId = i;
                     while ( !freeIdList.isEmpty() )
                     {
                         freeId( freeIdList.removeFirst() );

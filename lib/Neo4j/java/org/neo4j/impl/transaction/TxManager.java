@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -187,9 +187,9 @@ public class TxManager implements TransactionManager
             else
             {
                 tmOk = false;
-                log.severe( "Unkown active tx log file[" + txLog.getName()
+                log.severe( "Unknown active tx log file[" + txLog.getName()
                     + "], unable to switch." );
-                throw new IOException( "Unkown txLogFile[" + txLog.getName()
+                throw new IOException( "Unknown txLogFile[" + txLog.getName()
                     + "] not equals to either [" + txLog1FileName + "] or ["
                     + txLog2FileName + "]" );
             }
@@ -256,7 +256,7 @@ public class TxManager implements TransactionManager
                     }
                     else
                     {
-                        log.warning( "Unkown xid: " + xids[i] );
+                        log.warning( "Unknown xid: " + xids[i] );
                     }
                 }
             }
@@ -497,9 +497,15 @@ public class TxManager implements TransactionManager
         }
         tx = new TransactionImpl( this );
         txThreadMap.put( thread, tx );
+        // start record written on resource enlistment
+    }
+    
+    // called when a resource gets enlisted
+    void writeStartRecord( byte globalId[] ) throws SystemException
+    {
         try
         {
-            getTxLog().txStart( tx.getGlobalId() );
+            getTxLog().txStart( globalId );
         }
         catch ( IOException e )
         {
@@ -613,7 +619,10 @@ public class TxManager implements TransactionManager
             txThreadMap.remove( thread );
             try
             {
-                getTxLog().txDone( tx.getGlobalId() );
+                if ( tx.isGlobalStartRecordWritten() )
+                {
+                    getTxLog().txDone( tx.getGlobalId() );
+                }
             }
             catch ( IOException e )
             {
@@ -640,7 +649,10 @@ public class TxManager implements TransactionManager
         txThreadMap.remove( thread );
         try
         {
-            getTxLog().txDone( tx.getGlobalId() );
+            if ( tx.isGlobalStartRecordWritten() )
+            {
+                getTxLog().txDone( tx.getGlobalId() );
+            }
         }
         catch ( IOException e )
         {
@@ -676,7 +688,10 @@ public class TxManager implements TransactionManager
         txThreadMap.remove( thread );
         try
         {
-            getTxLog().txDone( tx.getGlobalId() );
+            if ( tx.isGlobalStartRecordWritten() )
+            {
+                getTxLog().txDone( tx.getGlobalId() );
+            }
         }
         catch ( IOException e )
         {
@@ -729,7 +744,10 @@ public class TxManager implements TransactionManager
             txThreadMap.remove( thread );
             try
             {
-                getTxLog().txDone( tx.getGlobalId() );
+                if ( tx.isGlobalStartRecordWritten() )
+                {
+                    getTxLog().txDone( tx.getGlobalId() );
+                }
             }
             catch ( IOException e )
             {

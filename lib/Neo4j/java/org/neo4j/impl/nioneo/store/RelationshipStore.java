@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,7 @@ public class RelationshipStore extends AbstractStore implements Store
 {
     // relationship store version, each rel store ends with this
     // string (byte encoded)
-    private static final String VERSION = "RelationshipStore v0.9.3";
+    private static final String VERSION = "RelationshipStore v0.9.5";
 
     // record header size
     // directed|in_use(byte)+first_node(int)+second_node(int)+rel_type(int)+
@@ -89,8 +89,7 @@ public class RelationshipStore extends AbstractStore implements Store
         PersistenceWindow window = acquireWindow( id, OperationType.READ );
         try
         {
-            RelationshipRecord record = getRecord( id, window.getBuffer(), 
-                false );
+            RelationshipRecord record = getRecord( id, window, false );
             return record;
         }
         finally
@@ -113,8 +112,7 @@ public class RelationshipStore extends AbstractStore implements Store
         }
         try
         {
-            RelationshipRecord record = getRecord( id, window.getBuffer(), 
-                true );
+            RelationshipRecord record = getRecord( id, window, true );
             return record;
         }
         finally
@@ -143,7 +141,7 @@ public class RelationshipStore extends AbstractStore implements Store
             OperationType.WRITE );
         try
         {
-            updateRecord( record, window.getBuffer() );
+            updateRecord( record, window );
         }
         finally
         {
@@ -151,11 +149,11 @@ public class RelationshipStore extends AbstractStore implements Store
         }
     }
 
-    private void updateRecord( RelationshipRecord record, Buffer buffer )
+    private void updateRecord( RelationshipRecord record, 
+        PersistenceWindow window )
     {
         int id = record.getId();
-        int offset = (int) (id - buffer.position()) * getRecordSize();
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( id );
         if ( record.inUse() )
         {
             byte inUse = Record.IN_USE.byteValue();
@@ -175,10 +173,10 @@ public class RelationshipStore extends AbstractStore implements Store
         }
     }
 
-    private RelationshipRecord getRecord( int id, Buffer buffer, boolean check )
+    private RelationshipRecord getRecord( int id, PersistenceWindow window, 
+        boolean check )
     {
-        int offset = (int) (id - buffer.position()) * getRecordSize();
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( id );
         byte inUse = buffer.get();
         boolean inUseFlag = ((inUse & Record.IN_USE.byteValue()) == 
             Record.IN_USE.byteValue());
@@ -204,5 +202,25 @@ public class RelationshipStore extends AbstractStore implements Store
     public String toString()
     {
         return "RelStore";
+    }
+
+    @Override
+    protected boolean versionFound( String version )
+    {
+        if ( !version.startsWith( "RelationshipStore" ) )
+        {
+            // non clean shutdown, need to do recover with right neo
+            return false;
+        }
+        if ( version.equals( "RelationshipStore v0.9.3" ) )
+        {
+            rebuildIdGenerator();
+            closeIdGenerator();
+            return true;
+        }
+        throw new RuntimeException( "Unknown store version " + version  + 
+            " Please make sure you are not running old Neo4j kernel " + 
+            " towards a store that has been created by newer version " + 
+            " of Neo4j." );
     }
 }

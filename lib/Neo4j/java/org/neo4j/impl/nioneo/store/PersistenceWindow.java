@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,7 +31,11 @@ public interface PersistenceWindow
      * @return The underlying buffer
      */
     public Buffer getBuffer();
+    
+    public Buffer getOffsettedBuffer( int id );
 
+    public int getRecordSize();
+    
     /**
      * Returns the current record/block position.
      * 

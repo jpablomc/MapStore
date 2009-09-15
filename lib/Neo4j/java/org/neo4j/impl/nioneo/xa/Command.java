@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -475,7 +475,7 @@ abstract class Command extends XaCommand
         @Override
         public boolean equals( Object o )
         {
-            if ( !(o instanceof PropertyCommand) )
+            if ( !(o instanceof PropertyIndexCommand) )
             {
                 return false;
             }
@@ -636,7 +636,7 @@ abstract class Command extends XaCommand
                 case 10:
                     return PropertyType.SHORT;
             }
-            throw new RuntimeException( "Unkown property type:" + type );
+            throw new RuntimeException( "Unknown property type:" + type );
         }
 
         @Override
@@ -781,7 +781,7 @@ abstract class Command extends XaCommand
                 return RelationshipTypeCommand.readCommand( neoStore,
                     byteChannel, buffer );
             default:
-                throw new IOException( "Unkown command type[" + commandType
+                throw new IOException( "Unknown command type[" + commandType
                     + "]" );
         }
     }

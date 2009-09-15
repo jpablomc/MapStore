@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,7 @@ public class NodeStore extends AbstractStore implements Store
 {
     // node store version, each node store should end with this string
     // (byte encoded)
-    private static final String VERSION = "NodeStore v0.9.3";
+    private static final String VERSION = "NodeStore v0.9.5";
 
     // in_use(byte)+next_rel_id(int)+next_prop_id(int)
     private static final int RECORD_SIZE = 9;
@@ -85,7 +85,7 @@ public class NodeStore extends AbstractStore implements Store
         PersistenceWindow window = acquireWindow( id, OperationType.READ );
         try
         {
-            NodeRecord record = getRecord( id, window.getBuffer(), false );
+            NodeRecord record = getRecord( id, window, false );
             return record;
         }
         finally
@@ -114,7 +114,7 @@ public class NodeStore extends AbstractStore implements Store
             OperationType.WRITE );
         try
         {
-            updateRecord( record, window.getBuffer() );
+            updateRecord( record, window );
         }
         finally
         {
@@ -137,7 +137,7 @@ public class NodeStore extends AbstractStore implements Store
 
         try
         {
-            NodeRecord record = getRecord( id, window.getBuffer(), true );
+            NodeRecord record = getRecord( id, window, true );
             if ( record == null )
             {
                 return false;
@@ -150,10 +150,10 @@ public class NodeStore extends AbstractStore implements Store
         }
     }
 
-    private NodeRecord getRecord( int id, Buffer buffer, boolean check )
+    private NodeRecord getRecord( int id, PersistenceWindow window, 
+        boolean check )
     {
-        int offset = (int) (id - buffer.position()) * getRecordSize();
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( id );
         boolean inUse = (buffer.get() == Record.IN_USE.byteValue());
         if ( !inUse )
         {
@@ -170,11 +170,10 @@ public class NodeStore extends AbstractStore implements Store
         return nodeRecord;
     }
 
-    private void updateRecord( NodeRecord record, Buffer buffer )
+    private void updateRecord( NodeRecord record, PersistenceWindow window )
     {
         int id = record.getId();
-        int offset = (int) (id - buffer.position()) * getRecordSize();
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( id );
         if ( record.inUse() )
         {
             buffer.put( Record.IN_USE.byteValue() ).putInt( 
@@ -189,9 +188,29 @@ public class NodeStore extends AbstractStore implements Store
             }
         }
     }
-
+    
     public String toString()
     {
         return "NodeStore";
+    }
+    
+    @Override
+    protected boolean versionFound( String version )
+    {
+        if ( !version.startsWith( "NodeStore" ) )
+        {
+            // non clean shutdown, need to do recover with right neo
+            return false;
+        }
+        if ( version.equals( "NodeStore v0.9.3" ) )
+        {
+            rebuildIdGenerator();
+            closeIdGenerator();
+            return true;
+        }
+        throw new RuntimeException( "Unknown store version " + version  + 
+            " Please make sure you are not running old Neo4j kernel " + 
+            " towards a store that has been created by newer version " + 
+            " of Neo4j." );
     }
 }

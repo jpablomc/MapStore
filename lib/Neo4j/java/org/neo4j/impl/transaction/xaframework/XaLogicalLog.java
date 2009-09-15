@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,14 +22,9 @@ package org.neo4j.impl.transaction.xaframework;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.lang.ref.WeakReference;
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -40,6 +35,7 @@ import javax.transaction.xa.Xid;
 
 import org.neo4j.impl.transaction.XidImpl;
 import org.neo4j.impl.util.ArrayMap;
+import org.neo4j.impl.util.FileUtils;
 
 /**
  * <CODE>XaLogicalLog</CODE> is a transaction and logical log combined. In
@@ -85,7 +81,7 @@ public class XaLogicalLog
 
     private FileChannel fileChannel = null;
     private final ByteBuffer buffer;
-    private MemoryMappedLogBuffer writeBuffer = null;
+    private LogBuffer writeBuffer = null;
     private long logVersion = 0;
     private ArrayMap<Integer,StartEntry> xidIdentMap = 
         new ArrayMap<Integer,StartEntry>( 4, false, true );
@@ -103,19 +99,34 @@ public class XaLogicalLog
     private boolean autoRotate = true;
     private long rotateAtSize = 10*1024*1024; // 10MB
     private boolean backupSlave = false;
+    private boolean useMemoryMapped = true;
 
     XaLogicalLog( String fileName, XaResourceManager xaRm, XaCommandFactory cf,
-        XaTransactionFactory xaTf )
+        XaTransactionFactory xaTf, Map<Object,Object> config )
     {
         this.fileName = fileName;
         this.xaRm = xaRm;
         this.cf = cf;
         this.xaTf = xaTf;
+        this.useMemoryMapped = getMemoryMapped( config );
         log = Logger.getLogger( this.getClass().getName() + "/" + fileName );
         buffer = ByteBuffer.allocateDirect( 9 + Xid.MAXGTRIDSIZE
             + Xid.MAXBQUALSIZE * 10 );
     }
-
+    
+    private boolean getMemoryMapped( Map<Object,Object> config )
+    {
+        if ( config != null )
+        {
+            String value = (String) config.get( "use_memory_mapped_buffers" );
+            if ( value != null && value.toLowerCase().equals( "false" ) )
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    
     synchronized void open() throws IOException
     {
         String activeFileName = fileName + ".active";
@@ -151,7 +162,10 @@ public class XaLogicalLog
             File copy = new File( fileName + ".copy" );
             if ( copy.exists() )
             {
-                copy.delete();
+                if ( !copy.delete() )
+                {
+                    log.warning( "Unable to delete " + copy.getName() );
+                }
             }
             if ( c == CLEAN )
             {
@@ -177,7 +191,10 @@ public class XaLogicalLog
                 File otherLog = new File( fileName + ".2" );
                 if ( otherLog.exists() )
                 {
-                    otherLog.delete();
+                    if ( !otherLog.delete() )
+                    {
+                        log.warning( "Unable to delete " + copy.getName() );
+                    }
                 }
                 open( newLog );
             }
@@ -192,17 +209,27 @@ public class XaLogicalLog
                 File otherLog = new File( fileName + ".1" );
                 if ( otherLog.exists() )
                 {
-                    otherLog.delete();
+                    if ( !otherLog.delete() )
+                    {
+                        log.warning( "Unable to delete " + copy.getName() );
+                    }
                 }
                 currentLog = LOG2;
                 open( newLog );
             }
             else
             {
-                throw new IllegalStateException( "Unkown active log: " + c );
+                throw new IllegalStateException( "Unknown active log: " + c );
             }
         }
-        writeBuffer = new MemoryMappedLogBuffer( fileChannel );
+        if ( !useMemoryMapped )
+        {
+            writeBuffer = new DirectMappedLogBuffer( fileChannel );
+        }
+        else
+        {
+            writeBuffer = new MemoryMappedLogBuffer( fileChannel );
+        }
     }
     
     private void open( String fileToOpen ) throws IOException
@@ -555,15 +582,6 @@ public class XaLogicalLog
         return true;
     }
 
-    // used in testing, truncate log to real size removing any non used memory
-    // mapped space
-    public synchronized void truncate() throws IOException
-    {
-        long truncateAt = writeBuffer.getFileChannelPosition();
-        writeBuffer.releaseMemoryMapped();
-        fileChannel.truncate( truncateAt );
-    }
-    
     private void checkLogRotation() throws IOException
     {
         if ( autoRotate && 
@@ -579,114 +597,10 @@ public class XaLogicalLog
         }
     }
 
-/*    synchronized void makeNewLog()
-    {
-        // save recovered log
-        if ( xidIdentMap.size() > 0 )
-        {
-            throw new RuntimeException( "Active transactions found: "
-                + xidIdentMap.size() + ", can't make new log file" );
-        }
-        WeakReference<MappedByteBuffer> bufferWeakRef = null;
-        if ( writeBuffer != null )
-        {
-            MappedByteBuffer mappedBuffer = writeBuffer.getMappedBuffer();
-            if ( mappedBuffer != null )
-            {
-                bufferWeakRef = new WeakReference<MappedByteBuffer>(
-                    mappedBuffer );
-                mappedBuffer = null;
-            }
-            writeBuffer = null;
-        }
-        try
-        {
-            fileChannel.close();
-        }
-        catch ( IOException e )
-        {
-            throw new RuntimeException(
-                "Unable to close log[" + fileName + "]", e );
-        }
-        File file = new File( fileName );
-        if ( !file.exists() )
-        {
-            throw new RuntimeException( "Logical log[" + fileName
-                + "] not found" );
-        }
-        // TODO: if store old logs save them here
-        try
-        {
-            String saveName = fileName + ".recovered-"
-                + System.currentTimeMillis();
-            boolean success = file.renameTo( new File( saveName ) );
-            assert success;
-        }
-        catch ( Exception e )
-        {
-            boolean renamed = false;
-            String saveName = fileName + ".recovered-"
-                + System.currentTimeMillis();
-            try
-            {
-                renamed = file.renameTo( new File( saveName ) );
-            }
-            catch ( Exception ee )
-            {
-            }
-            for ( int i = 0; i < 3 && !renamed; i++ )
-            {
-                // hack for WINBLOWS
-                try
-                {
-                    Thread.sleep( 500 );
-                }
-                catch ( InterruptedException ee )
-                {
-                } // ok
-                try
-                {
-                    System.gc();
-                    renamed = file.delete();
-                }
-                catch ( Exception ee )
-                {
-                } // ok...
-            }
-            if ( !renamed && bufferWeakRef != null )
-            {
-                try
-                {
-                    clean( bufferWeakRef.get() );
-                    renamed = file.delete();
-                }
-                catch ( Exception ee )
-                {
-                } // at least we tried...
-            }
-
-            if ( !renamed )
-            {
-                throw new RuntimeException( "Unable to rename recovered "
-                    + "log file[" + fileName + "]" );
-            }
-        }
-        // create a new one
-        try
-        {
-            this.open();
-        }
-        catch ( IOException e )
-        {
-            throw new RuntimeException( "Unable to open new log[" + fileName
-                + "]", e );
-        }
-    }*/
-    
     private void renameCurrentLogFileAndIncrementVersion( String logFileName, 
         long endPosition ) throws IOException
     {
-        WeakReference<MappedByteBuffer> bufferWeakRef = releaseCurrentLogFile();
+        releaseCurrentLogFile();
         File file = new File( logFileName );
         if ( !file.exists() )
         {
@@ -695,50 +609,7 @@ public class XaLogicalLog
         }
         String newName = fileName + ".v" + xaTf.getAndSetNewVersion();
         File newFile = new File( newName );
-        if ( newFile.exists() )
-        {
-            throw new IllegalStateException( newName + " already exist" );
-        }
-        // TODO: if store old logs save them here
-        boolean renamed = false;
-        try
-        {
-            renamed = file.renameTo( newFile );
-        }
-        catch ( Exception e )
-        {
-        }
-
-        // hack for WINBLOWS
-        for ( int i = 0; i < 3 && !renamed; i++ )
-        {
-            try
-            {
-                Thread.sleep( 500 );
-            }
-            catch ( InterruptedException e )
-            {
-            } // ok
-            try
-            {
-                System.gc();
-                renamed = file.renameTo( newFile );
-            }
-            catch ( Exception e )
-            {
-            } // ok...
-        }
-        if ( !renamed && bufferWeakRef != null )
-        {
-            try
-            {
-                clean( bufferWeakRef.get() );
-                renamed = file.renameTo( newFile );
-            }
-            catch ( Exception e )
-            {
-            } // at least we tried...
-        }
+        boolean renamed = FileUtils.renameFile( file, newFile );
         
         if ( !renamed )
         {
@@ -750,7 +621,7 @@ public class XaLogicalLog
             {
                 FileChannel channel = new RandomAccessFile( newName, 
                     "rw" ).getChannel();
-                channel.truncate( endPosition );
+                FileUtils.truncateFile( channel, endPosition );
             }
             catch ( Exception e )
             {
@@ -760,106 +631,16 @@ public class XaLogicalLog
         }
     }
     
-    private void renameCopyToVersion( String copy, String newFileName ) 
-        throws IOException
-    {
-        File file = new File( copy );
-        if ( !file.exists() )
-        {
-            throw new IOException( "Logical copy log[" + copy + 
-                "] not found" );
-        }
-        File newFile = new File( newFileName );
-        if ( newFile.exists() )
-        {
-            throw new IOException( "Logical log new version[" + newFileName + 
-                "] already exist" );
-        }
-        boolean renamed = false;
-        try
-        {
-            renamed = file.renameTo( newFile );
-        }
-        catch ( Exception e )
-        {
-        }
-
-        // hack for WINBLOWS
-        for ( int i = 0; i < 3 && !renamed; i++ )
-        {
-            try
-            {
-                Thread.sleep( 500 );
-            }
-            catch ( InterruptedException e )
-            {
-            } // ok
-            try
-            {
-                System.gc();
-                renamed = file.renameTo( newFile );
-            }
-            catch ( Exception e )
-            {
-            } // ok...
-        }
-        if ( !renamed )
-        {
-            log.warning( "Unable to rename copy[" + copy +
-                "] to logical log version[" + newFile + "]" );
-        }
-    }
-    
     private void deleteCurrentLogFile( String logFileName ) throws IOException
     {
-        WeakReference<MappedByteBuffer> bufferWeakRef = releaseCurrentLogFile();
+        releaseCurrentLogFile();
         File file = new File( logFileName );
         if ( !file.exists() )
         {
             throw new IOException( "Logical log[" + logFileName + 
                 "] not found" );
         }
-        // TODO: if store old logs save them here
-        boolean deleted = false;
-        try
-        {
-            deleted = file.delete();
-        }
-        catch ( Exception e )
-        {
-        }
-
-        // hack for WINBLOWS
-        for ( int i = 0; i < 3 && !deleted; i++ )
-        {
-            try
-            {
-                Thread.sleep( 500 );
-            }
-            catch ( InterruptedException e )
-            {
-            } // ok
-            try
-            {
-                System.gc();
-                deleted = file.delete();
-            }
-            catch ( Exception e )
-            {
-            } // ok...
-        }
-        if ( !deleted && bufferWeakRef != null )
-        {
-            try
-            {
-                clean( bufferWeakRef.get() );
-                deleted = file.delete();
-            }
-            catch ( Exception e )
-            {
-            } // at least we tried...
-        }
-
+        boolean deleted = FileUtils.deleteFile( file );
         if ( !deleted )
         {
             log.warning( "Unable to delete clean logical log[" + logFileName +
@@ -867,25 +648,15 @@ public class XaLogicalLog
         }
     }
     
-    private WeakReference<MappedByteBuffer> releaseCurrentLogFile() 
-        throws IOException
+    private void releaseCurrentLogFile() throws IOException
     {
-        WeakReference<MappedByteBuffer> bufferWeakRef = null;
         if ( writeBuffer != null )
         {
             writeBuffer.force();
-            MappedByteBuffer mappedBuffer = writeBuffer.getMappedBuffer();
-            if ( mappedBuffer != null )
-            {
-                bufferWeakRef = new WeakReference<MappedByteBuffer>(
-                    mappedBuffer );
-                mappedBuffer = null;
-            }
             writeBuffer = null;
         }
         fileChannel.close();
         fileChannel = null;
-        return bufferWeakRef;
     }
 
     public synchronized void close() throws IOException
@@ -900,10 +671,7 @@ public class XaLogicalLog
         {
             log.info( "Close invoked with " + xidIdentMap.size() + 
                 " running transaction(s). " );
-            if ( writeBuffer != null )
-            {
-                writeBuffer.force();
-            }
+            writeBuffer.force();
             writeBuffer = null;
             fileChannel.close();
             log.info( "Dirty log: " + fileName + "." + currentLog + 
@@ -947,9 +715,9 @@ public class XaLogicalLog
             log.info( "Unable to read timestamp information, "
                 + "no records in logical log." );
             fileChannel.close();
-            boolean success = new File( logFileName ).renameTo( new File( 
-                logFileName + "_unkown_timestamp_" + 
-                System.currentTimeMillis() + ".log" ) );
+            boolean success = FileUtils.renameFile( new File( logFileName ), 
+                new File( logFileName + "_unknown_timestamp_" + 
+                    System.currentTimeMillis() + ".log" ) );
             assert success;
             fileChannel = new RandomAccessFile( logFileName, 
                 "rw" ).getChannel();
@@ -1021,7 +789,7 @@ public class XaLogicalLog
                 return false;
             default:
                 throw new IOException( "Internal recovery failed, "
-                    + "unkown log entry[" + entry + "]" );
+                    + "unknown log entry[" + entry + "]" );
         }
     }
 
@@ -1055,38 +823,6 @@ public class XaLogicalLog
         return -1;
     }
 
-    // workaround suggested at sun bug database
-    // see http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4724038
-    private void clean( final MappedByteBuffer mappedBuffer ) throws Exception
-    {
-        AccessController.doPrivileged( new PrivilegedAction<Object>()
-        {
-            public Object run()
-            {
-                if ( mappedBuffer == null )
-                {
-                    return null;
-                }
-                try
-                {
-                    Method getCleanerMethod = mappedBuffer.getClass()
-                        .getMethod( "cleaner", new Class[0] );
-                    getCleanerMethod.setAccessible( true );
-                    sun.misc.Cleaner cleaner = 
-                        (sun.misc.Cleaner) getCleanerMethod.invoke( 
-                            mappedBuffer, new Object[0] );
-                    cleaner.clean();
-                }
-                catch ( Exception e )
-                {
-                    log.log( Level.INFO, "Unable to invoke cleaner method on "
-                        + mappedBuffer, e );
-                }
-                return null;
-            }
-        } );
-    }
-    
     public ReadableByteChannel getLogicalLog( long version ) throws IOException
     {
         String name = fileName + ".v" + version;
@@ -1109,7 +845,7 @@ public class XaLogicalLog
         File file = new File(name );
         if ( file.exists() )
         {
-            return file.delete();
+            return FileUtils.deleteFile( file );
         }
         return false;
     }
@@ -1182,7 +918,7 @@ public class XaLogicalLog
                     return false;
                 default:
                     throw new IOException( "Internal recovery failed, "
-                        + "unkown log entry[" + entry + "]" );
+                        + "unknown log entry[" + entry + "]" );
             }
         }
 
@@ -1490,14 +1226,14 @@ public class XaLogicalLog
                     readAndWriteCommandEntry( newLog );
                     break;
                 case DONE:
-                    readAndWriteDoneEntry();
+                    readAndVerifyDoneEntry();
                     break;
                 case EMPTY:
                     emptyHit = true;
                     break;
                 default:
                     throw new IOException( "Log rotation failed, "
-                        + "unkown log entry[" + entry + "]" );
+                        + "unknown log entry[" + entry + "]" );
             }
             buffer.clear();
             buffer.limit( 1 );
@@ -1519,7 +1255,14 @@ public class XaLogicalLog
             throw new IOException( "version change failed" );
         }
         fileChannel = newLog;
-        writeBuffer = new MemoryMappedLogBuffer( fileChannel );
+        if ( !useMemoryMapped )
+        {
+            writeBuffer = new DirectMappedLogBuffer( fileChannel );
+        }
+        else
+        {
+            writeBuffer = new MemoryMappedLogBuffer( fileChannel );
+        }
     }
     
     private long getFirstStartEntry( long endPosition )
@@ -1596,29 +1339,21 @@ public class XaLogicalLog
         }
     }
 
-    private void readAndWriteDoneEntry() 
+    private void readAndVerifyDoneEntry() 
         throws IOException
     {
         buffer.clear();
-        buffer.limit( 1 + 4 );
-        buffer.put( DONE );
+        buffer.limit( 4 );
         if ( fileChannel.read( buffer ) != 4 )
         {
             throw new IllegalStateException( "Unable to read done entry" );
         }
         buffer.flip();
-        buffer.position( 1 );
         int identifier = buffer.getInt();
-        FileChannel writeToLog = null;
         if ( xidIdentMap.get( identifier ) != null )
         {
             throw new IllegalStateException( identifier + 
                 " done entry found but still active" );
-        }
-        buffer.position( 0 );
-        if ( writeToLog != null && writeToLog.write( buffer ) != 5 )
-        {
-            throw new RuntimeException( "Unable to write done entry" );
         }
     }
 

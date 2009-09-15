@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -390,6 +390,11 @@ public final class EmbeddedNeo implements NeoService
         return super.toString() + " [" + storeDir + "]";
     }
     
+    public String getStoreDir()
+    {
+        return storeDir;
+    }
+    
     public Iterable<Node> getAllNodes()
     {
         return new Iterable<Node>() {
@@ -432,12 +437,13 @@ public final class EmbeddedNeo implements NeoService
         
         public synchronized Node next()
         {
-            Node nextNode = currentNode;
-            currentNode = null;
-            if ( nextNode == null )
+            if ( !hasNext() )
             {
                 throw new NoSuchElementException();
             }
+            
+            Node nextNode = currentNode;
+            currentNode = null;
             return nextNode;
         }
         

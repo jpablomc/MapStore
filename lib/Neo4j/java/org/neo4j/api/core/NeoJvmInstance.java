@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -77,6 +77,12 @@ class NeoJvmInstance
         params.put( "neostore.propertystore.db.strings.mapped_memory", "130M" );
         params.put( "neostore.propertystore.db.arrays.mapped_memory", "130M" );
         params.put( "neostore.relationshipstore.db.mapped_memory", "100M" );
+        // if on windows, default no memory mapping
+        String nameOs = System.getProperty( "os.name" );
+        if ( nameOs.startsWith( "Windows" ) )
+        {
+            params.put( "use_memory_mapped_buffers", "false" );
+        }
         return params;
     }
 
@@ -146,10 +152,12 @@ class NeoJvmInstance
 
         config.getEventModule().start();
         config.getTxModule().start();
-        config.getPersistenceModule().start( persistenceSource );
+        config.getPersistenceModule().start( config.getTxModule().getTxManager(), 
+            persistenceSource );
         persistenceSource.start( config.getTxModule().getXaDataSourceManager() );
         config.getIdGeneratorModule().start();
-        config.getNeoModule().start( params );
+        config.getNeoModule().start( config.getLockReleaser(),  
+            config.getPersistenceModule().getPersistenceManager(), params );
         if ( lucene != null )
         {
             config.getTxModule().getXaDataSourceManager().unregisterDataSource(
@@ -262,12 +270,12 @@ class NeoJvmInstance
             cacheManager = new AdaptiveCacheManager();
             txModule = new TxModule( this.storeDir );
             lockManager = new LockManager( txModule.getTxManager() );
-            persistenceModule = new PersistenceModule( txModule.getTxManager() );
+            lockReleaser = new LockReleaser( lockManager, 
+                txModule.getTxManager() );
+            persistenceModule = new PersistenceModule(); // txModule.getTxManager() );
             idGeneratorModule = new IdGeneratorModule();
             neoModule = new NeoModule( cacheManager, lockManager, txModule
-                .getTxManager(), persistenceModule.getPersistenceManager(), 
-                idGeneratorModule.getIdGenerator() );
-            lockReleaser = neoModule.getLockReleaser();
+                .getTxManager(), idGeneratorModule.getIdGenerator() );
         }
 
         /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -54,6 +54,9 @@ public class NeoShellServer extends SimpleAppServer
         this.bashInterpreter = new BashVariableInterpreter();
         this.bashInterpreter.addReplacer( "W", new WorkingDirReplacer() );
         this.setProperty( AbstractClient.PROMPT_KEY, "neo-sh \\W$ " );
+        this.setProperty( AbstractClient.TITLE_KEYS_KEY,
+            ".*name.*,.*title.*" );
+        this.setProperty( AbstractClient.TITLE_MAX_LENGTH, "40" );
     }
 
     @Override
@@ -100,8 +103,9 @@ public class NeoShellServer extends SimpleAppServer
     {
         public String getReplacement( ShellServer server, Session session )
         {
-            return NeoApp.getDisplayNameForNode( NeoApp.getCurrentNode(
-                    (NeoShellServer) server, session ) ).toString();
+            return NeoApp.getDisplayName( ( NeoShellServer ) server, session,
+                NeoApp.getCurrent( ( NeoShellServer ) server,
+                    session ) ).toString();
         }
     }
 }

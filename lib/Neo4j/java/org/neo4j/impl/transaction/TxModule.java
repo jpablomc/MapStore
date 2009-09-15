@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -75,9 +75,6 @@ public class TxModule
         {
             new XaDataSourceConfigFileParser().parse( dataSourceConfigFile );
         }
-        // TODO: fix this, make it IOC somehow
-        UserTransactionImpl.tm = txManager;
-        SpringTransactionManager.tm = txManager;
         txManager.init( xaDsManager );
         startIsOk = false;
     }
@@ -285,7 +282,7 @@ public class TxModule
     {
         return txManager;
     }
-
+    
     public XaDataSourceManager getXaDataSourceManager()
     {
         return xaDsManager;

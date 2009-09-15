@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,7 +21,7 @@ package org.neo4j.impl.shell.apps;
 
 import java.rmi.RemoteException;
 
-import org.neo4j.api.core.Node;
+import org.neo4j.impl.shell.NeoApp;
 import org.neo4j.util.shell.AppCommandParser;
 import org.neo4j.util.shell.Output;
 import org.neo4j.util.shell.Session;
@@ -29,31 +29,32 @@ import org.neo4j.util.shell.ShellException;
 
 /**
  * Mimics the POSIX application with the same name, i.e. removes a property from
- * a node. It could also (regarding POSIX) delete nodes, but it doesn't.
+ * a node or relationship. It could also (regarding POSIX) delete nodes,
+ * but it doesn't.
  */
-public class Rm extends NodeOrRelationshipApp
+public class Rm extends NeoApp
 {
     @Override
     public String getDescription()
     {
-        return "Removes a property from the current node. " + "Usage: rm <key>";
+        return "Removes a property from the current node or relationship.\n" +
+            "Usage: rm <key>";
     }
 
     @Override
-    protected String exec( AppCommandParser parser, Session session, Output out )
-        throws ShellException
+    protected String exec( AppCommandParser parser, Session session,
+        Output out ) throws ShellException
     {
         if ( parser.arguments().isEmpty() )
         {
-            throw new ShellException( "Must supply the property key to "
-                + "remove, like: rm title" );
+            throw new ShellException( "Must supply the property key to " +
+                "remove, like: rm title" );
         }
 
         try
         {
             String key = parser.arguments().get( 0 );
-            Node node = this.getCurrentNode( session );
-            NodeOrRelationship thing = getNodeOrRelationship( node, parser );
+            NodeOrRelationship thing = getCurrent( session );
             if ( thing.removeProperty( key ) == null )
             {
                 out.println( "Property '" + key + "' not found" );

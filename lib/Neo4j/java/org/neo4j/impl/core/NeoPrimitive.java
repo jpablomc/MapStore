@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -451,6 +451,11 @@ abstract class NeoPrimitive
                         removeMap.put( cachedIndex.getKeyId(), property );
                         break;
                     }
+                }
+                if ( removeMap.get( cachedIndex.getKeyId() ) != null )
+                {
+                    success = true;
+                    return null;
                 }
                 property = propertyMap.get( cachedIndex.getKeyId() );
                 if ( property != null )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -22,8 +22,8 @@ package org.neo4j.impl.shell.apps;
 import java.rmi.RemoteException;
 import java.util.List;
 
-import org.neo4j.api.core.Node;
 import org.neo4j.impl.shell.NeoApp;
+import org.neo4j.impl.shell.apps.NodeOrRelationship.TypedId;
 import org.neo4j.util.shell.AppCommandParser;
 import org.neo4j.util.shell.Output;
 import org.neo4j.util.shell.Session;
@@ -37,17 +37,18 @@ public class Pwd extends NeoApp
     @Override
     public String getDescription()
     {
-        return "Prints path to current node";
+        return "Prints path to current node or relatioship";
     }
 
     @Override
-    protected String exec( AppCommandParser parser, Session session, Output out )
-        throws RemoteException
+    protected String exec( AppCommandParser parser, Session session,
+        Output out ) throws RemoteException
     {
-        Node currentNode = this.getCurrentNode( session );
-        out.println( "Current node is " + getDisplayNameForNode( currentNode ) );
+        NodeOrRelationship current = this.getCurrent( session );
+        out.println( "Current is " +
+            getDisplayName( getNeoServer(), session, current ) );
 
-        String path = stringifyPath( Cd.readPaths( session ) );
+        String path = stringifyPath( Cd.readPaths( session ), session );
         if ( path.length() > 0 )
         {
             out.println( path );
@@ -55,17 +56,18 @@ public class Pwd extends NeoApp
         return null;
     }
 
-    private String stringifyPath( List<Long> pathIds )
+    private String stringifyPath( List<TypedId> pathIds, Session session )
     {
         if ( pathIds.isEmpty() )
         {
             return "";
         }
         StringBuilder path = new StringBuilder();
-        for ( Long id : pathIds )
+        for ( TypedId id : pathIds )
         {
-            path.append( getDisplayNameForNode( id ) ).append( "-->" );
+            path.append(
+                getDisplayName( getNeoServer(), session, id ) ).append( "-->" );
         }
-        return path.append( getDisplayNameForCurrentNode() ).toString();
+        return path.append( getDisplayNameForCurrent( session ) ).toString();
     }
 }

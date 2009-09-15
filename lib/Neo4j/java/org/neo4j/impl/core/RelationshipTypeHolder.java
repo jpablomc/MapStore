@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -192,7 +192,8 @@ class RelationshipTypeHolder
                     createrThread.wait( 50 );
                 }
                 catch ( InterruptedException e )
-                { // ok
+                { 
+                    Thread.interrupted();
                 }
             }
         }

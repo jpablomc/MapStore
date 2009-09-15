@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -145,15 +145,23 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore
             ByteBuffer buffer = ByteBuffer.wrap( version );
             getFileChannel().position( fileSize - version.length );
             getFileChannel().read( buffer );
-            if ( !expectedVersion.equals( new String( version ) ) )
-            {
-                setStoreNotOk();
-            }
             buffer = ByteBuffer.allocate( 4 );
             getFileChannel().position( 0 );
             getFileChannel().read( buffer );
             buffer.flip();
             blockSize = buffer.getInt();
+            if ( blockSize <= 0 )
+            {
+                throw new StoreFailureException( "Illegal block size: " + 
+                    blockSize );
+            }
+            if ( !expectedVersion.equals( new String( version ) ) )
+            {
+                if ( !versionFound( new String( version ) ) )
+                {
+                    setStoreNotOk();
+                }
+            }
             if ( (fileSize - version.length) % blockSize != 0 )
             {
                 setStoreNotOk();
@@ -177,7 +185,8 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore
             setStoreNotOk();
         }
         setWindowPool( new PersistenceWindowPool( getStorageFileName(),
-            getBlockSize(), getFileChannel(), getMappedMem() ) );
+            getBlockSize(), getFileChannel(), getMappedMem(), 
+            getIfMemoryMapped() ) );
     }
 
     /**
@@ -189,7 +198,7 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore
     {
         return blockSize;
     }
-
+    
     /**
      * Returns next free block.
      * 
@@ -224,9 +233,7 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore
         PersistenceWindow window = acquireWindow( blockId, OperationType.WRITE );
         try
         {
-            Buffer buffer = window.getBuffer();
-            int offset = (int) (blockId - buffer.position()) * getBlockSize();
-            buffer.setOffset( offset );
+            Buffer buffer = window.getOffsettedBuffer( blockId );
             if ( record.inUse() )
             {
                 assert record.getId() != record.getPrevBlock();
@@ -362,7 +369,7 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore
             try
             {
                 DynamicRecord record = getLightRecord( 
-                    blockId, window.getBuffer() );
+                    blockId, window );
                 recordList.add( record );
                 blockId = record.getNextBlock();
             }
@@ -381,8 +388,9 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore
         try
         {
             Buffer buf = window.getBuffer();
-            int offset = (int) (blockId - buf.position()) * getBlockSize()
-                + BLOCK_HEADER_SIZE;
+            // NOTE: skip of header in offset
+            int offset = (int) ((blockId & 0xFFFFFFFFL) - 
+                buf.position()) * getBlockSize() + BLOCK_HEADER_SIZE;
             buf.setOffset( offset );
             byte bytes[] = new byte[record.getLength()];
             buf.get( bytes );
@@ -394,11 +402,10 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore
         }
     }
 
-    private DynamicRecord getLightRecord( int blockId, Buffer buffer )
+    private DynamicRecord getLightRecord( int blockId, PersistenceWindow window )
     {
         DynamicRecord record = new DynamicRecord( blockId );
-        int offset = (int) (blockId - buffer.position()) * getBlockSize();
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( blockId );
         byte inUse = buffer.get();
         if ( inUse != Record.IN_USE.byteValue() )
         {
@@ -424,11 +431,10 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore
         return record;
     }
 
-    private DynamicRecord getRecord( int blockId, Buffer buffer )
+    private DynamicRecord getRecord( int blockId, PersistenceWindow window )
     {
         DynamicRecord record = new DynamicRecord( blockId );
-        int offset = (int) (blockId - buffer.position()) * getBlockSize();
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( blockId );
         byte inUse = buffer.get();
         if ( inUse != Record.IN_USE.byteValue() )
         {
@@ -466,7 +472,7 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore
                 OperationType.READ );
             try
             {
-                DynamicRecord record = getRecord( blockId, window.getBuffer() );
+                DynamicRecord record = getRecord( blockId, window );
                 recordList.add( record );
                 blockId = record.getNextBlock();
             }
@@ -494,9 +500,7 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore
         PersistenceWindow window = acquireWindow( blockId, OperationType.READ );
         try
         {
-            Buffer buffer = window.getBuffer();
-            int offset = (int) (blockId - buffer.position()) * getBlockSize();
-            buffer.setOffset( offset );
+            Buffer buffer = window.getOffsettedBuffer( blockId );
             byte inUse = buffer.get();
             if ( inUse != Record.IN_USE.byteValue() )
             {
@@ -530,10 +534,7 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore
                 {
                     releaseWindow( window );
                     window = acquireWindow( nextBlock, OperationType.READ );
-                    buffer = window.getBuffer();
-                    offset = (int) (nextBlock - buffer.position())
-                        * getBlockSize();
-                    buffer.setOffset( offset );
+                    buffer = window.getOffsettedBuffer( nextBlock );
                     inUse = buffer.get();
                     if ( inUse != Record.IN_USE.byteValue() )
                     {
@@ -581,6 +582,11 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore
      */
     protected void rebuildIdGenerator()
     {
+        if ( getBlockSize() <= 0 )
+        {
+            throw new StoreFailureException( "Illegal blockSize: " + 
+                getBlockSize() );
+        }
         logger.fine( "Rebuilding id generator for[" + getStorageFileName()
             + "] ..." );
         closeIdGenerator();

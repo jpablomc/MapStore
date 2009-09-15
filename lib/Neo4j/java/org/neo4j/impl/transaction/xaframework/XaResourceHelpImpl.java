@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -128,7 +128,7 @@ public abstract class XaResourceHelpImpl implements XaResource
         }
         else
         {
-            throw new XAException( "Unkown flag[" + flags + "]" );
+            throw new XAException( "Unknown flag[" + flags + "]" );
         }
     }
 

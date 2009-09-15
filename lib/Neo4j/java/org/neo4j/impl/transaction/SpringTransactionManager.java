@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -28,10 +28,26 @@ import javax.transaction.SystemException;
 import javax.transaction.Transaction;
 import javax.transaction.TransactionManager;
 
+import org.neo4j.api.core.EmbeddedNeo;
+import org.neo4j.api.core.NeoService;
+
 public class SpringTransactionManager implements TransactionManager
 {
-    static TransactionManager tm;
+    private TransactionManager tm;
 
+    /**
+     * Using this constructor requires setting the the transaction manager via
+     * {@link #setTransactionManager(TransactionManager)} method.
+     */
+    public SpringTransactionManager()
+    { 
+    }
+    
+    public SpringTransactionManager( NeoService neo )
+    {
+        this.tm = ((EmbeddedNeo) neo).getConfig().getTxModule().getTxManager();
+    }
+    
     public void begin() throws NotSupportedException, SystemException
     {
         tm.begin();
@@ -79,5 +95,15 @@ public class SpringTransactionManager implements TransactionManager
     public Transaction suspend() throws SystemException
     {
         return tm.suspend();
+    }
+
+    public void setTransactionManager( TransactionManager tm )
+    {
+        this.tm = tm;
+    }
+
+    public TransactionManager getTransactionManager()
+    {
+        return tm;
     }
 }

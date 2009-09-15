@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -36,7 +36,7 @@ import java.util.Map;
 public class RelationshipTypeStore extends AbstractStore implements Store
 {
     // store version, each store ends with this string (byte encoded)
-    private static final String VERSION = "RelationshipTypeStore v0.9.3";
+    private static final String VERSION = "RelationshipTypeStore v0.9.5";
 
     // record header size
     // in_use(byte)+type_blockId(int)
@@ -133,7 +133,7 @@ public class RelationshipTypeStore extends AbstractStore implements Store
         PersistenceWindow window = acquireWindow( id, OperationType.WRITE );
         try
         {
-            markAsReserved( id, window.getBuffer() );
+            markAsReserved( id, window );
         }
         finally
         {
@@ -167,7 +167,7 @@ public class RelationshipTypeStore extends AbstractStore implements Store
             OperationType.WRITE );
         try
         {
-            updateRecord( record, window.getBuffer() );
+            updateRecord( record, window );
         }
         finally
         {
@@ -185,7 +185,7 @@ public class RelationshipTypeStore extends AbstractStore implements Store
         PersistenceWindow window = acquireWindow( id, OperationType.READ );
         try
         {
-            record = getRecord( id, window.getBuffer() );
+            record = getRecord( id, window );
         }
         finally
         {
@@ -247,24 +247,16 @@ public class RelationshipTypeStore extends AbstractStore implements Store
         typeNameStore.freeBlockId( id );
     }
 
-    private void markAsReserved( int id, Buffer buffer )
+    private void markAsReserved( int id, PersistenceWindow window )
     {
-        int offset = (int) (id - buffer.position()) * getRecordSize();
-        buffer.setOffset( offset );
-        if ( buffer.get() != Record.NOT_IN_USE.byteValue() )
-        {
-            throw new StoreFailureException( "Record[" + id
-                + "] already in use" );
-        }
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( id );
         buffer.put( Record.IN_USE.byteValue() ).putInt(
             Record.RESERVED.intValue() );
     }
 
-    private RelationshipTypeRecord getRecord( int id, Buffer buffer )
+    private RelationshipTypeRecord getRecord( int id, PersistenceWindow window )
     {
-        int offset = (int) (id - buffer.position()) * getRecordSize();
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( id );
         byte inUse = buffer.get();
         if ( inUse == Record.NOT_IN_USE.byteValue() )
         {
@@ -273,7 +265,7 @@ public class RelationshipTypeStore extends AbstractStore implements Store
         if ( inUse != Record.IN_USE.byteValue() )
         {
             throw new StoreFailureException( "Record[" + id + 
-                "] unkown in use flag[" + inUse + "]" );
+                "] unknown in use flag[" + inUse + "]" );
         }
         RelationshipTypeRecord record = new RelationshipTypeRecord( id );
         record.setInUse( true );
@@ -281,11 +273,11 @@ public class RelationshipTypeStore extends AbstractStore implements Store
         return record;
     }
 
-    private void updateRecord( RelationshipTypeRecord record, Buffer buffer )
+    private void updateRecord( RelationshipTypeRecord record, 
+        PersistenceWindow window )
     {
         int id = record.getId();
-        int offset = (int) (id - buffer.position()) * getRecordSize();
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( id );
         if ( record.inUse() )
         {
             buffer.put( Record.IN_USE.byteValue() ).putInt(
@@ -312,7 +304,7 @@ public class RelationshipTypeStore extends AbstractStore implements Store
         IdGenerator.createGenerator( getStorageFileName() + ".id" );
         openIdGenerator();
         FileChannel fileChannel = getFileChannel();
-        int highId = -1;
+        long highId = -1;
         int recordSize = getRecordSize();
         try
         {
@@ -408,5 +400,26 @@ public class RelationshipTypeStore extends AbstractStore implements Store
     {
         typeNameStore.rebuildIdGenerators();
         super.rebuildIdGenerators();
+    }
+
+
+    @Override
+    protected boolean versionFound( String version )
+    {
+        if ( !version.startsWith( "RelationshipTypeStore" ) )
+        {
+            // non clean shutdown, need to do recover with right neo
+            return false;
+        }
+        if ( version.equals( "RelationshipTypeStore v0.9.3" ) )
+        {
+            rebuildIdGenerator();
+            closeIdGenerator();
+            return true;
+        }
+        throw new RuntimeException( "Unknown store version " + version  + 
+            " Please make sure you are not running old Neo4j kernel " + 
+            " towards a store that has been created by newer version " + 
+            " of Neo4j." );
     }
 }

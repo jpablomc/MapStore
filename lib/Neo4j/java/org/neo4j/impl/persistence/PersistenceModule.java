@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -31,15 +31,10 @@ public class PersistenceModule
 {
     private static final String MODULE_NAME = "PersistenceModule";
 
-    private final PersistenceManager persistenceManager;
+    private PersistenceManager persistenceManager;
 
-    private PersistenceSource source;
-    private final ResourceBroker broker;
-
-    public PersistenceModule( TransactionManager transactionManager )
+    public PersistenceModule()
     {
-        persistenceManager = new PersistenceManager( transactionManager );
-        broker = persistenceManager.getResourceBroker();
     }
 
     public synchronized void init()
@@ -47,16 +42,16 @@ public class PersistenceModule
         // Do nothing
     }
 
-    public synchronized void start( PersistenceSource persistenceSource )
+    public synchronized void start( TransactionManager transactionManager, 
+        PersistenceSource persistenceSource )
     {
-        this.source = persistenceSource;
-        broker.getDispatcher().persistenceSourceAdded( source );
+        this.persistenceManager = new PersistenceManager( transactionManager, 
+            persistenceSource );
     }
 
     public synchronized void reload()
     {
-        this.stop();
-        broker.getDispatcher().persistenceSourceRemoved( source );
+        throw new UnsupportedOperationException();
     }
 
     public synchronized void stop()
@@ -76,10 +71,5 @@ public class PersistenceModule
     public PersistenceManager getPersistenceManager()
     {
         return persistenceManager;
-    }
-    
-    public PersistenceSource getPersistenceSource()
-    {
-        return source;
     }
 }

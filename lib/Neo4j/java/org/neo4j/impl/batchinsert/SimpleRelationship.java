@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,10 @@ package org.neo4j.impl.batchinsert;
 
 import org.neo4j.api.core.RelationshipType;
 
+/**
+ * Simple relationship wrapping start node id, end node id and relationship 
+ * type. 
+ */
 public class SimpleRelationship
 {
     private final int id;

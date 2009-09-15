@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,7 @@ import java.util.Map;
 class DynamicArrayStore extends AbstractDynamicStore
 {
     // store version, each store ends with this string (byte encoded)
-    private static final String VERSION = "ArrayPropertyStore v0.9.3";
+    private static final String VERSION = "ArrayPropertyStore v0.9.5";
 
     private static enum ArrayType
     {
@@ -532,12 +532,32 @@ class DynamicArrayStore extends AbstractDynamicStore
             }
             return array;
         }
-        throw new RuntimeException( "Unkown array type[" + type + "]" );
+        throw new RuntimeException( "Unknown array type[" + type + "]" );
     }
 
     public Object getArray( int blockId )
     {
         byte bArray[] = get( blockId );
         return getRightArray( bArray );
+    }
+
+    @Override
+    protected boolean versionFound( String version )
+    {
+        if ( !version.startsWith( "ArrayPropertyStore" ) )
+        {
+            // non clean shutdown, need to do recover with right neo
+            return false;
+        }
+        if ( version.equals( "ArrayPropertyStore v0.9.3" ) )
+        {
+            rebuildIdGenerator();
+            closeIdGenerator();
+            return true;
+        }
+        throw new RuntimeException( "Unknown store version " + version  + 
+            " Please make sure you are not running old Neo4j kernel " + 
+            " towards a store that has been created by newer version " + 
+            " of Neo4j." );
     }
 }

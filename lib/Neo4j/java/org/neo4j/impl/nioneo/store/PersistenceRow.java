@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -52,7 +52,22 @@ class PersistenceRow extends LockableWindow
     {
         return buffer;
     }
+    
+    public int getRecordSize()
+    {
+        return recordSize;
+    }
 
+    public Buffer getOffsettedBuffer( int id )
+    {
+        if ( (id & 0xFFFFFFFFL) != buffer.position() )
+        {
+            throw new StoreFailureException( "Id[" + id + 
+                "] not equal to buffer position[" + buffer.position() + "]" );
+        }
+        return buffer;
+    }
+    
     public long position()
     {
         return position;
@@ -63,7 +78,7 @@ class PersistenceRow extends LockableWindow
         try
         {
             long fileSize = getFileChannel().size();
-            int recordCount = (int) (fileSize / recordSize);
+            long recordCount = fileSize / recordSize;
             // possible last element not written completely, therefore if
             // fileSize % recordSize can be non 0 and we check > instead of >=
             if ( position > recordCount )
@@ -90,9 +105,9 @@ class PersistenceRow extends LockableWindow
     
     void writeOut()
     {
+        ByteBuffer byteBuffer = buffer.getBuffer();
         if ( getOperationType() == OperationType.WRITE )
         {
-            ByteBuffer byteBuffer = buffer.getBuffer();
             byteBuffer.clear();
             try
             {
@@ -106,6 +121,7 @@ class PersistenceRow extends LockableWindow
                     + position + "] @[" + position * recordSize + "]", e );
             }
         }
+        byteBuffer.clear();
     }
 
     public int size()

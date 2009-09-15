@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -33,7 +33,7 @@ import java.util.Map;
 public class PropertyIndexStore extends AbstractStore implements Store
 {
     // store version, should end with this string (byte encoded)
-    private static final String VERSION = "PropertyIndex v0.9.3";
+    private static final String VERSION = "PropertyIndex v0.9.5";
     private static final int KEY_STORE_BLOCK_SIZE = 30;
 
     // in_use(byte)+prop_count(int)+key_block_id(int)
@@ -125,7 +125,7 @@ public class PropertyIndexStore extends AbstractStore implements Store
     {
         LinkedList<PropertyIndexData> indexList = 
             new LinkedList<PropertyIndexData>();
-        int maxIdInUse = getHighestPossibleIdInUse();
+        long maxIdInUse = getHighestPossibleIdInUse();
         int found = 0;
         for ( int i = 0; i <= maxIdInUse && found < count; i++ )
         {
@@ -151,7 +151,7 @@ public class PropertyIndexStore extends AbstractStore implements Store
         PersistenceWindow window = acquireWindow( id, OperationType.READ );
         try
         {
-            record = getRecord( id, window.getBuffer() );
+            record = getRecord( id, window );
         }
         finally
         {
@@ -171,7 +171,7 @@ public class PropertyIndexStore extends AbstractStore implements Store
         PersistenceWindow window = acquireWindow( id, OperationType.READ );
         try
         {
-            PropertyIndexRecord record = getRecord( id, window.getBuffer() );
+            PropertyIndexRecord record = getRecord( id, window );
             record.setIsLight( true );
             return record;
         }
@@ -201,7 +201,7 @@ public class PropertyIndexStore extends AbstractStore implements Store
             OperationType.WRITE );
         try
         {
-            updateRecord( record, window.getBuffer() );
+            updateRecord( record, window );
         }
         finally
         {
@@ -227,10 +227,9 @@ public class PropertyIndexStore extends AbstractStore implements Store
         return keyPropertyStore.nextBlockId();
     }
 
-    private PropertyIndexRecord getRecord( int id, Buffer buffer )
+    private PropertyIndexRecord getRecord( int id, PersistenceWindow window )
     {
-        int offset = (int) (id - buffer.position()) * getRecordSize();
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( id );
         boolean inUse = (buffer.get() == Record.IN_USE.byteValue());
         if ( !inUse )
         {
@@ -243,11 +242,11 @@ public class PropertyIndexStore extends AbstractStore implements Store
         return record;
     }
 
-    private void updateRecord( PropertyIndexRecord record, Buffer buffer )
+    private void updateRecord( PropertyIndexRecord record, 
+        PersistenceWindow window )
     {
         int id = record.getId();
-        int offset = (int) (id - buffer.position()) * getRecordSize();
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( id );
         if ( record.inUse() )
         {
             buffer.put( Record.IN_USE.byteValue() ).putInt(
@@ -318,5 +317,25 @@ public class PropertyIndexStore extends AbstractStore implements Store
     public String toString()
     {
         return "PropertyIndexStore";
+    }
+
+    @Override
+    protected boolean versionFound( String version )
+    {
+        if ( !version.startsWith( "PropertyIndex" ) )
+        {
+            // non clean shutdown, need to do recover with right neo
+            return false;
+        }
+        if ( version.equals( "PropertyIndex v0.9.3" ) )
+        {
+            rebuildIdGenerator();
+            closeIdGenerator();
+            return true;
+        }
+        throw new RuntimeException( "Unknown store version " + version  + 
+            " Please make sure you are not running old Neo4j kernel " + 
+            " towards a store that has been created by newer version " + 
+            " of Neo4j." );
     }
 }

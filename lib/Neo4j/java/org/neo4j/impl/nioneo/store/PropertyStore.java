@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -35,7 +35,7 @@ import java.util.Map;
 public class PropertyStore extends AbstractStore implements Store
 {
     // store version, each store ends with this string (byte encoded)
-    private static final String VERSION = "PropertyStore v0.9.3";
+    private static final String VERSION = "PropertyStore v0.9.5";
 
     // record header size
     // in_use(byte)+type(int)+key_indexId(int)+prop_blockId(long)+
@@ -195,7 +195,7 @@ public class PropertyStore extends AbstractStore implements Store
             OperationType.WRITE );
         try
         {
-            updateRecord( record, window.getBuffer() );
+            updateRecord( record, window );
         }
         finally
         {
@@ -216,7 +216,7 @@ public class PropertyStore extends AbstractStore implements Store
                 }
                 else
                 {
-                    throw new RuntimeException( "Unkown dynamic record" );
+                    throw new RuntimeException( "Unknown dynamic record" );
                 }
             }
         }
@@ -225,11 +225,10 @@ public class PropertyStore extends AbstractStore implements Store
     // in_use(byte)+type(int)+key_blockId(int)+prop_blockId(long)+
     // prev_prop_id(int)+next_prop_id(int)
 
-    private void updateRecord( PropertyRecord record, Buffer buffer )
+    private void updateRecord( PropertyRecord record, PersistenceWindow window )
     {
         int id = record.getId();
-        int offset = (int) (id - buffer.position()) * getRecordSize();
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( id );
         if ( record.inUse() )
         {
             buffer.put( Record.IN_USE.byteValue() ).putInt(
@@ -252,7 +251,7 @@ public class PropertyStore extends AbstractStore implements Store
         PersistenceWindow window = acquireWindow( id, OperationType.READ );
         try
         {
-            PropertyRecord record = getRecord( id, window.getBuffer() );
+            PropertyRecord record = getRecord( id, window );
             record.setIsLight( true );
             return record;
         }
@@ -295,7 +294,7 @@ public class PropertyStore extends AbstractStore implements Store
         PersistenceWindow window = acquireWindow( id, OperationType.READ );
         try
         {
-            record = getRecord( id, window.getBuffer() );
+            record = getRecord( id, window );
         }
         finally
         {
@@ -328,10 +327,9 @@ public class PropertyStore extends AbstractStore implements Store
         return record;
     }
 
-    private PropertyRecord getRecord( int id, Buffer buffer )
+    private PropertyRecord getRecord( int id, PersistenceWindow window )
     {
-        int offset = (int) (id - buffer.position()) * getRecordSize();
-        buffer.setOffset( offset );
+        Buffer buffer = window.getOffsettedBuffer( id );
         if ( buffer.get() != Record.IN_USE.byteValue() )
         {
             throw new StoreFailureException( "Record[" + id + "] not in use" );
@@ -371,7 +369,7 @@ public class PropertyStore extends AbstractStore implements Store
             case 10:
                 return PropertyType.SHORT;
             default:
-                throw new StoreFailureException( "Unkown enum type:" + type );
+                throw new StoreFailureException( "Unknown enum type:" + type );
         }
     }
     
@@ -424,7 +422,7 @@ public class PropertyStore extends AbstractStore implements Store
         {
             return (short) propertyRecord.getPropBlock();
         }
-        throw new RuntimeException( "Unkown type: " + type );
+        throw new RuntimeException( "Unknown type: " + type );
     }
 
     @Override
@@ -533,7 +531,7 @@ public class PropertyStore extends AbstractStore implements Store
         }
         else
         {
-            throw new IllegalArgumentException( "Unkown property type on: "
+            throw new IllegalArgumentException( "Unknown property type on: "
                 + value );
         }
     }
@@ -623,5 +621,25 @@ public class PropertyStore extends AbstractStore implements Store
             offset += currentArray.length;
         }
         return arrayPropertyStore.getRightArray( bArray );
+    }
+    
+    @Override
+    protected boolean versionFound( String version )
+    {
+        if ( !version.startsWith( "PropertyStore" ) )
+        {
+            // non clean shutdown, need to do recover with right neo
+            return false;
+        }
+        if ( version.equals( "PropertyStore v0.9.3" ) )
+        {
+            rebuildIdGenerator();
+            closeIdGenerator();
+            return true;
+        }
+        throw new RuntimeException( "Unknown store version " + version  + 
+            " Please make sure you are not running old Neo4j kernel " + 
+            " towards a store that has been created by newer version " + 
+            " of Neo4j." );
     }
 }

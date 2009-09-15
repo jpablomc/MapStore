@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -32,7 +32,6 @@ import org.neo4j.api.core.StopEvaluator;
 import org.neo4j.api.core.Traverser;
 import org.neo4j.api.core.Traverser.Order;
 import org.neo4j.impl.shell.NeoApp;
-import org.neo4j.impl.shell.NeoShellServer;
 import org.neo4j.util.shell.AppCommandParser;
 import org.neo4j.util.shell.OptionValueType;
 import org.neo4j.util.shell.Output;
@@ -50,37 +49,39 @@ public class Rmrel extends NeoApp
      */
     public Rmrel()
     {
-        this.addValueType( "r", new OptionContext( OptionValueType.MUST,
-            "The relationship id." ) );
         this.addValueType( "d", new OptionContext( OptionValueType.NONE,
-            "Must be supplied if the affected other node gets decoupled "
-                + "after this operation so that it gets deleted." ) );
+            "Must be supplied if the affected other node gets decoupled\n" +
+            "after this operation so that it gets deleted." ) );
     }
 
     @Override
     public String getDescription()
     {
-        return "Removes a relationship";
+        return "Deletes a relationship\nUsage: rmrel <relationship id>";
     }
 
     @Override
-    protected String exec( AppCommandParser parser, Session session, Output out )
-        throws ShellException
+    protected String exec( AppCommandParser parser, Session session,
+        Output out ) throws ShellException
     {
-        if ( parser.options().get( "r" ) == null )
+        assertCurrentIsNode( session );
+        
+        if ( parser.arguments().isEmpty() )
         {
             throw new ShellException(
-                "Must supply relationship id (-r <id>) to delete" );
+                "Must supply relationship id to delete as the first argument" );
         }
 
-        Node currentNode = this.getCurrentNode( session );
-        Relationship rel = findRel( currentNode, Long.parseLong( parser
-            .options().get( "r" ) ) );
+        Node currentNode = this.getCurrent( session ).asNode();
+        Relationship rel = findRel( currentNode, Long.parseLong(
+            parser.arguments().get( 0 ) ) );
         rel.delete();
-        if ( !currentNode.getRelationships().iterator().hasNext() )
+        if ( !currentNode.equals(
+            getNeoServer().getNeo().getReferenceNode() ) &&
+            !currentNode.getRelationships().iterator().hasNext() )
         {
-            throw new ShellException( "It would result in the current node "
-                + currentNode + " to be decoupled (no relationships left)" );
+            throw new ShellException( "It would result in the current node " +
+                currentNode + " to be decoupled (no relationships left)" );
         }
         Node otherNode = rel.getOtherNode( currentNode );
         if ( !otherNode.getRelationships().iterator().hasNext() )
@@ -89,11 +90,11 @@ public class Rmrel extends NeoApp
                 "d" );
             if ( !deleteOtherNodeWhenEmpty )
             {
-                throw new ShellException( "Since the node "
-                    + getDisplayNameForNode( otherNode )
-                    + " would be decoupled after this, you must supply the"
-                    + " -d (for delete-when-decoupled) so that the other node "
-                    + "(" + otherNode + ") may be deleted" );
+                throw new ShellException( "Since the node " +
+                    getDisplayName( getNeoServer(), session, otherNode ) +
+                    " would be decoupled after this, you must supply the" +
+                    " -d (for delete-when-decoupled) so that the other node " +
+                    "(" + otherNode + ") may be deleted" );
             }
             otherNode.delete();
         }
@@ -101,13 +102,13 @@ public class Rmrel extends NeoApp
         {
             if ( !this.hasPathToRefNode( otherNode ) )
             {
-                throw new ShellException( "It would result in " + otherNode
-                    + " to be recursively decoupled with the reference node" );
+                throw new ShellException( "It would result in " + otherNode +
+                    " to be recursively decoupled with the reference node" );
             }
             if ( !this.hasPathToRefNode( currentNode ) )
             {
-                throw new ShellException( "It would result in " + currentNode
-                    + " to be recursively decoupled with the reference node" );
+                throw new ShellException( "It would result in " + currentNode +
+                    " to be recursively decoupled with the reference node" );
             }
         }
         return null;
@@ -123,8 +124,8 @@ public class Rmrel extends NeoApp
                 return rel;
             }
         }
-        throw new ShellException( "No relationship " + relId + " connected to "
-            + currentNode );
+        throw new ShellException( "No relationship " + relId +
+            " connected to " + currentNode );
     }
 
     private Iterable<RelationshipType> getAllRelationshipTypes()
@@ -142,11 +143,10 @@ public class Rmrel extends NeoApp
             filterList.add( Direction.BOTH );
         }
 
-        Node refNode = ((NeoShellServer) this.getServer()).getNeo()
-            .getReferenceNode();
+        Node refNode = getNeoServer().getNeo().getReferenceNode();
         Traverser traverser = node.traverse( Order.DEPTH_FIRST,
-            StopEvaluator.END_OF_NETWORK, ReturnableEvaluator.ALL, filterList
-                .toArray() );
+            StopEvaluator.END_OF_GRAPH, ReturnableEvaluator.ALL,
+            filterList.toArray() );
         for ( Node testNode : traverser )
         {
             if ( refNode.equals( testNode ) )

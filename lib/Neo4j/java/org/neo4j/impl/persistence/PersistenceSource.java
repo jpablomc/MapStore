@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2008 "Neo Technology,"
+ * Copyright (c) 2002-2009 "Neo Technology,"
  *     Network Engine for Objects in Lund AB [http://neotechnology.com]
  *
  * This file is part of Neo4j.
@@ -45,9 +45,9 @@ public interface PersistenceSource
      */
     public int nextId( Class<?> clazz );
 
-    public int getHighestPossibleIdInUse( Class<?> clazz );
+    public long getHighestPossibleIdInUse( Class<?> clazz );
 
-    public int getNumberOfIdsInUse( Class<?> clazz );
+    public long getNumberOfIdsInUse( Class<?> clazz );
     
     public XaDataSource getXaDataSource();
 }
