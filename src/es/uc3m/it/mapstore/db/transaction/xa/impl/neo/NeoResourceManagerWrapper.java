@@ -8,14 +8,12 @@ package es.uc3m.it.mapstore.db.transaction.xa.impl.neo;
 import es.uc3m.it.mapstore.bean.MapStoreCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
 import es.uc3m.it.mapstore.bean.NeoRelationship;
-import es.uc3m.it.mapstore.config.MapStoreConfig;
 import es.uc3m.it.mapstore.db.impl.MapStoreSession;
-import es.uc3m.it.mapstore.db.transaction.xa.*;
+import es.uc3m.it.mapstore.db.transaction.xa.impl.ResourceManagerlImpl;
 import es.uc3m.it.mapstore.exception.MapStoreRunTimeException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -35,7 +33,7 @@ import org.neo4j.impl.util.ArrayMap;
  *
  * @author Pablo
  */
-public class NeoResourceManagerWrapper implements ResourceManagerWrapper  {
+public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
     private String type;
     private String name;
     private PersistenceModule pm;
@@ -133,29 +131,8 @@ public class NeoResourceManagerWrapper implements ResourceManagerWrapper  {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    private List<String> getPropertiesToProcess(MapStoreItem item) {
-        List<String> props = new ArrayList<String>();
-        Map<Class,List<ResourceManagerWrapper>> mapa = new HashMap<Class,List<ResourceManagerWrapper>>();
-        for (String prop :item.getProperties().keySet()) {
-            if (processable(prop)) {
-                Object value = item.getProperty(prop);
-                List<ResourceManagerWrapper> lista = mapa.get(value.getClass());
-                if (lista == null) {
-                    lista = MapStoreConfig.getInstance().getXaResourceLookupForClass(value.getClass());
-                    mapa.put(value.getClass(),lista);
-                }
-                if (lista.contains(this)) props.add(prop);
-            }
-        }
-        return props;
-    }
-
     private void init() throws MapStoreRunTimeException {
         NeoPersistenceManager.init(pm);
-    }
-
-    private boolean processable(String prop) {
-        return true;
     }
 
     @Override

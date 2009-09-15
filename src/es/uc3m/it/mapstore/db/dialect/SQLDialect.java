@@ -43,6 +43,10 @@ public class SQLDialect implements MapStoreDialect {
         return aux;
     }
 
+    public String insertTypeName(long id, String type, String name) {
+        return "INSERT INTO NAME(ID,TYPE,NAME) VALUES("+id+", '"+ type + "', '" + name +"'";
+    }
+
     @Override
     public Serializable update(long id, String key, Object value) {
         throw new UnsupportedOperationException("Not supported yet.");
@@ -94,5 +98,9 @@ public class SQLDialect implements MapStoreDialect {
         statements.add("SELECT * FROM INTEGERS");
         statements.add("SELECT * FROM LONGS");
         return statements;
+    }
+
+    public String getByTypeName(String type, String name) {
+        return "SELECT ID FROM NAME WHERE TYPE = '"+ type + "' AND NAME = '" + name +"'";
     }
 }

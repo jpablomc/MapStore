@@ -22,6 +22,9 @@ public class DerbyDialect extends SQLDialect{
         statements.add("CREATE TABLE LONGS(ID BIGINT NOT NULL, PROPERTY VARCHAR(50) NOT NULL, VALUE BIGINT)");
         statements.add("CREATE INDEX LONGS_VALUE ON LONGS (VALUE)");
         statements.add("ALTER TABLE LONGS ADD PRIMARY KEY(ID,PROPERTY)");
+        statements.add("CREATE TABLE NAME(ID BIGINT NOT NULL, TYPE VARCHAR(50) NOT NULL, NAME VARCHAR(50) NOT NULL)");
+        statements.add("ALTER TABLE LONGS ADD PRIMARY KEY(ID)");
+        statements.add("CREATE UNIQUE INDEX NAME_TYPE_NAME ON NAME (TYPE,NAME)");
         return statements;
     }
 }

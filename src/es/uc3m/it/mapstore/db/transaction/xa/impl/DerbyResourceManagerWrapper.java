@@ -7,8 +7,6 @@ package es.uc3m.it.mapstore.db.transaction.xa.impl;
 
 import es.uc3m.it.mapstore.bean.MapStoreCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
-import es.uc3m.it.mapstore.config.MapStoreConfig;
-import es.uc3m.it.mapstore.db.transaction.xa.*;
 import es.uc3m.it.mapstore.db.dialect.SQLDialect;
 import es.uc3m.it.mapstore.exception.MapStoreRunTimeException;
 import java.sql.Connection;
@@ -16,9 +14,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -33,7 +29,7 @@ import org.apache.derby.jdbc.EmbeddedXADataSource40;
  *
  * @author Pablo
  */
-public class DerbyResourceManagerWrapper implements ResourceManagerWrapper {
+public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
     private EmbeddedXADataSource40 ds;
     private SQLDialect dialect;
     private String type;
@@ -140,6 +136,10 @@ public class DerbyResourceManagerWrapper implements ResourceManagerWrapper {
                 ps = conn.prepareStatement(sql);
                 ps.executeUpdate();
             }
+            String sql = dialect.insertTypeName(id, item.getType(), item.getName());
+            PreparedStatement ps;
+            ps = conn.prepareStatement(sql);
+            ps.executeUpdate();
             result = t.delistResource(r, XAResource.TMSUCCESS);
             if (!result) throw new MapStoreRunTimeException("Can not delist resource in transaction");
         } catch (RollbackException ex) {
@@ -158,23 +158,6 @@ public class DerbyResourceManagerWrapper implements ResourceManagerWrapper {
         if (e != null) throw new MapStoreRunTimeException(e);
     }
 
-    private List<String> getPropertiesToProcess(MapStoreItem item) {
-        List<String> props = new ArrayList<String>();
-        Map<Class,List<ResourceManagerWrapper>> mapa = new HashMap<Class,List<ResourceManagerWrapper>>();
-        for (String prop :item.getProperties().keySet()) {
-            if (processable(prop)) {
-                Object value = item.getProperty(prop);
-                List<ResourceManagerWrapper> lista = mapa.get(value.getClass());
-                if (lista == null) {
-                    lista = MapStoreConfig.getInstance().getXaResourceLookupForClass(value.getClass());
-                    mapa.put(value.getClass(),lista);
-                }
-                if (lista.contains(this)) props.add(prop);
-            }
-        }
-        return props;
-    }
-
     @Override
     public void delete(long id, Transaction t) {
         throw new UnsupportedOperationException("Not supported yet.");
@@ -188,10 +171,6 @@ public class DerbyResourceManagerWrapper implements ResourceManagerWrapper {
     @Override
     public void update(MapStoreItem item, Transaction t) {
         throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    private boolean processable(String prop) {
-        return true;
     }
 
     @Override
