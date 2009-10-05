@@ -7,6 +7,7 @@ package es.uc3m.it.mapstore.db.transaction.xa.impl;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
@@ -234,7 +235,7 @@ public abstract class AbstractXAResource implements XAResource{
     protected abstract void doRollback(Xid arg0) throws XAException;
 
 
-    private class XidImpl implements Xid{
+    protected class XidImpl implements Xid{
         private int formatId;
         private byte[] globalTransactionId;
         private byte[] branchQualifier;
@@ -310,4 +311,22 @@ public abstract class AbstractXAResource implements XAResource{
             return isEquals;
         }
     }
+
+    protected final void setPreparedForRecover(List<Xid> xids) throws XAException {
+        try {
+            s.acquire();
+        } catch (InterruptedException ex) {
+            Logger.getLogger(AbstractXAResource.class.getName()).log(Level.SEVERE, null, ex);
+            throw new XAException(XAException.XAER_RMERR);
+        }
+        try {
+            for (Xid x : xids) {
+                XidImpl xid = new XidImpl(x.getFormatId(), x.getGlobalTransactionId(), x.getBranchQualifier());
+                xidPrepared.add(xid);
+            }
+        } finally {
+            s.release();
+        }
+    }
+
 }

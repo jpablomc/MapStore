@@ -24,7 +24,7 @@ public class LuceneXAConnection implements XAConnection{
     private String path;
 
     public LuceneXAConnection(String path) {
-        resource = new LuceneXAResource();
+        resource = new LuceneXAResource(path);
         this.path = path;
     }
 

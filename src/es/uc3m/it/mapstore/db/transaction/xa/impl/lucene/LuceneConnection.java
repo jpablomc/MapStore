@@ -6,28 +6,14 @@
 package es.uc3m.it.mapstore.db.transaction.xa.impl.lucene;
 
 import es.uc3m.it.mapstore.bean.MapStoreItem;
+import es.uc3m.it.mapstore.db.transaction.xa.impl.AbstractConnection;
 import java.io.IOException;
-import java.sql.Array;
-import java.sql.Blob;
-import java.sql.CallableStatement;
-import java.sql.Clob;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.NClob;
-import java.sql.PreparedStatement;
-import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
-import java.sql.SQLWarning;
-import java.sql.SQLXML;
-import java.sql.Savepoint;
-import java.sql.Statement;
-import java.sql.Struct;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -46,52 +32,23 @@ import org.apache.lucene.store.LockObtainFailedException;
  *
  * @author Pablo
  */
-public class LuceneConnection implements Connection {
+public class LuceneConnection extends AbstractConnection {
     IndexWriter w;
     Map<Long,Document> data;
     Set<Long> dataDelete;
     boolean prepared;
     String path;
     Analyzer analyzer;
+    List<LuceneOperation> operations;
       
     public LuceneConnection(String path) throws CorruptIndexException, LockObtainFailedException, IOException {
         analyzer = new StandardAnalyzer();
         data = new HashMap<Long,Document>();
         dataDelete = new HashSet<Long>();
         this.path = path;
+        operations = new ArrayList<LuceneOperation>();
     }
-
-
-    @Override
-    public Statement createStatement() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public PreparedStatement prepareStatement(String sql) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public CallableStatement prepareCall(String sql) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public String nativeSQL(String sql) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setAutoCommit(boolean autoCommit) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public boolean getAutoCommit() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
+    
     @Override
     public void commit() throws SQLException {
         if (!prepared) prepare();
@@ -106,239 +63,22 @@ public class LuceneConnection implements Connection {
             throw new SQLException(ex);
         }
     }
-
-    @Override
-    public void rollback() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void close() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public boolean isClosed() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public DatabaseMetaData getMetaData() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setReadOnly(boolean readOnly) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public boolean isReadOnly() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setCatalog(String catalog) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public String getCatalog() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setTransactionIsolation(int level) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public int getTransactionIsolation() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public SQLWarning getWarnings() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void clearWarnings() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Map<String, Class<?>> getTypeMap() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setHoldability(int holdability) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public int getHoldability() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Savepoint setSavepoint() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Savepoint setSavepoint(String name) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void rollback(Savepoint savepoint) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void releaseSavepoint(Savepoint savepoint) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Clob createClob() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Blob createBlob() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public NClob createNClob() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public SQLXML createSQLXML() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public boolean isValid(int timeout) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setClientInfo(String name, String value) throws SQLClientInfoException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setClientInfo(Properties properties) throws SQLClientInfoException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public String getClientInfo(String name) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Properties getClientInfo() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Array createArrayOf(String typeName, Object[] elements) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public <T> T unwrap(Class<T> iface) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    public void indexNew(long id, String property, Object value) throws SQLException {
-        Document d = data.get(id);
-        if (d == null) {
-            d = new Document();
-            data.put(id, d);
-            Field f = new Field(MapStoreItem.ID,Long.toString(id),Field.Store.YES,Field.Index.NOT_ANALYZED);
-            d.add(f);
-        }
-        //Comprobar que no sea el id...
-        if (!MapStoreItem.ID.equals(property)) {
-            Field f = new Field(property,value.toString(), Field.Store.NO,Field.Index.ANALYZED);
-            d.add(f);
-        }        
+    public void indexNew(long id, String property, Object value) throws SQLException {        
+        doNew(id, property, value);
+        LuceneOperation op = new LuceneOperation(LuceneOperation.CREATE, new Object[]{id,property,value});
+        operations.add(op);
     }
 
     public void index(long id, String property, Object value) throws SQLException {
-        delete(id); //TODO: Tal vez versionar
-        indexNew(id,property,value);
+        doUpdate(id,property,value);
+        LuceneOperation op = new LuceneOperation(LuceneOperation.UPDATE, new Object[]{id,property,value});
+        operations.add(op);
     }
 
     public void delete(long id) throws SQLException {
-        dataDelete.add(id);
+        doDelete(id);
+        LuceneOperation op = new LuceneOperation(LuceneOperation.DELETE, new Object[]{id});
+        operations.add(op);
     }
 
     public int prepare() throws SQLException {        
@@ -386,5 +126,33 @@ public class LuceneConnection implements Connection {
             Logger.getLogger(LuceneConnection.class.getName()).log(Level.SEVERE, null, ex);
         }
         return docs;
+    }
+
+    private void doDelete(long id) {
+        dataDelete.add(id);
+    }
+
+    private void doNew(long id, String property, Object value) {
+        Document d = data.get(id);
+        if (d == null) {
+            d = new Document();
+            data.put(id, d);
+            Field f = new Field(MapStoreItem.ID, Long.toString(id), Field.Store.YES, Field.Index.NOT_ANALYZED);
+            d.add(f);
+        }
+        //Comprobar que no sea el id...
+        if (!MapStoreItem.ID.equals(property)) {
+            Field f = new Field(property, value.toString(), Field.Store.NO, Field.Index.ANALYZED);
+            d.add(f);
+        }
+    }
+
+    private void doUpdate(long id, String property, Object value) throws SQLException {
+        doDelete(id); //TODO: Tal vez versionar
+        doNew(id, property, value);
+    }
+
+    public List<LuceneOperation> getOperations() {
+        return operations;
     }
 }

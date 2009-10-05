@@ -6,6 +6,7 @@
 package es.uc3m.it.mapstore.db.transaction.xa.impl.disk;
 
 import es.uc3m.it.mapstore.bean.MapStoreItem;
+import es.uc3m.it.mapstore.db.transaction.xa.impl.AbstractConnection;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -15,76 +16,48 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
-import java.sql.Array;
-import java.sql.Blob;
-import java.sql.CallableStatement;
-import java.sql.Clob;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.NClob;
-import java.sql.PreparedStatement;
-import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
-import java.sql.SQLWarning;
-import java.sql.SQLXML;
-import java.sql.Savepoint;
-import java.sql.Statement;
-import java.sql.Struct;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.transaction.xa.XAResource;
 
 /**
  *
  * @author Pablo
  */
-public class DiskConnection implements Connection {
+public class DiskConnection extends AbstractConnection {
     private String path;
     private Map<File,ByteArrayOutputStream> data;
     private List<File> dataDelete;
+    private Set<Long> locked;
     private boolean autocommit;
+    List<DiskOperation> operations;
 
     public DiskConnection(String path) {
         this.path = path;
         data = new HashMap<File,ByteArrayOutputStream>();
         dataDelete = new ArrayList<File>();
         autocommit = false;
+        locked = new HashSet<Long>();
+        operations = new ArrayList<DiskOperation>();
     }
 
-    @Override
-    public Statement createStatement() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public PreparedStatement prepareStatement(String sql) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public CallableStatement prepareCall(String sql) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public String nativeSQL(String sql) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setAutoCommit(boolean autoCommit) throws SQLException {
-        autocommit = true;
-    }
-
-    @Override
-    public boolean getAutoCommit() throws SQLException {
-        return autocommit;
+    public int prepare() throws SQLException {
+        for (File f : data.keySet()) {
+            if (f.exists()) throw new SQLException("Error while writing to disk");
+        }
+        for (File f : dataDelete) {
+            if (f.exists()) throw new SQLException("Error while writing to disk");
+        }
+        return (data.keySet().size()+dataDelete.size()>0)?XAResource.XA_OK:XAResource.XA_RDONLY;
     }
 
     @Override
@@ -104,236 +77,38 @@ public class DiskConnection implements Connection {
         for (File f : dataDelete) {
             f.delete();
         }
+        for (Long l: locked) {
+            DiskLock.releaseLock(l);
+        }
     }
 
-    @Override
-    public void rollback() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
+    private void acquireLock(Long id) throws SQLException {
+        DiskLock.acquireLock(id);
+        locked.add(id);
     }
-
-    @Override
-    public void close() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public boolean isClosed() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public DatabaseMetaData getMetaData() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setReadOnly(boolean readOnly) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public boolean isReadOnly() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setCatalog(String catalog) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public String getCatalog() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setTransactionIsolation(int level) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public int getTransactionIsolation() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public SQLWarning getWarnings() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void clearWarnings() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Map<String, Class<?>> getTypeMap() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setHoldability(int holdability) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public int getHoldability() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Savepoint setSavepoint() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Savepoint setSavepoint(String name) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void rollback(Savepoint savepoint) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void releaseSavepoint(Savepoint savepoint) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Clob createClob() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Blob createBlob() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public NClob createNClob() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public SQLXML createSQLXML() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public boolean isValid(int timeout) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setClientInfo(String name, String value) throws SQLClientInfoException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public void setClientInfo(Properties properties) throws SQLClientInfoException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public String getClientInfo(String name) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Properties getClientInfo() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Array createArrayOf(String typeName, Object[] elements) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public <T> T unwrap(Class<T> iface) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
-    @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
-    }
-
 
     public void storeNew(MapStoreItem i) throws SQLException, IOException {
         long id = i.getId();
+        acquireLock(id);
         File f = getLastVersion(id);
         if (f != null) throw new SQLException("Item already exist");
         MapStoreItem toRecord = eliminateNonPrimitive(i);
         serialize(getInitialVersion(id), toRecord);
+        operations.add(new DiskOperation(DiskOperation.CREATE, new Object[]{i}));
     }
 
     public void store(MapStoreItem i) throws SQLException, IOException {
         long id = i.getId();
+        acquireLock(id);
         File f = getNextVersion(id);
         if (f == null) throw new SQLException("Item can not be updated: Item does not exist");
         MapStoreItem toRecord = eliminateNonPrimitive(i);
         serialize(f, toRecord);
+        operations.add(new DiskOperation(DiskOperation.UPDATE, new Object[]{i}));
     }
 
     public void delete(long id) throws SQLException {
+        acquireLock(id);
         List<File> files = getAllVersions(id);
         if (files.isEmpty()) throw new SQLException("Item can not be deleted: Item does not exist");
         for (File aux : files) {
@@ -347,6 +122,7 @@ public class DiskConnection implements Connection {
         } else {
             dataDelete.addAll(files);
         }
+        operations.add(new DiskOperation(DiskOperation.DELETE, new Object[]{id}));
     }
 
     public List<MapStoreItem> getById(List<Long> ids) throws SQLException {
@@ -480,5 +256,9 @@ public class DiskConnection implements Connection {
                 + sep + aux.substring(4, 5) + sep + aux.substring(6, 7)
                 + sep + aux.substring(8, 9) + sep + aux.substring(10, 11)
                 + sep + aux.substring(12, 13) + sep + aux.substring(14, 15);
+    }
+
+    public List<DiskOperation> getOperations() {
+        return operations;
     }
 }
