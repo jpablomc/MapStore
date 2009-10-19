@@ -15,9 +15,9 @@ import java.util.List;
 public interface MapStoreDialect {
     public boolean isCreated(Object o);
     public List<Object> initializeDataBase();
-    public Serializable create(long id, String property, Object value);
+    public Serializable create(long id, long version, String property, Object value);
     public String insertTypeName(long id, String type, String name);
     public String getByTypeName(String type, String name);
-    public Serializable update(long id, String property, Object value);
+    public Serializable update(long id, long version, String property, Object value);
     public Serializable delete(long id);
 }

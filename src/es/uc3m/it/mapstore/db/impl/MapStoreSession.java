@@ -9,6 +9,7 @@ import es.uc3m.it.mapstore.bean.MapStoreCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
 import es.uc3m.it.mapstore.config.MapStoreConfig;
 import es.uc3m.it.mapstore.db.transaction.TransactionManagerWrapper;
+import es.uc3m.it.mapstore.db.transaction.xa.PersistenceManagerWrapper;
 import es.uc3m.it.mapstore.db.transaction.xa.ResourceManagerWrapper;
 import es.uc3m.it.mapstore.exception.MapStoreRunTimeException;
 import es.uc3m.it.mapstore.transformers.MapStoreTransformer;
@@ -167,12 +168,15 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         try {
             checkValidStateForOperations();
             item.setId(initializateId());
+            item.setVersion(0);
             long idItem = item.getId();
             Collection<ResourceManagerWrapper> resources = MapStoreConfig.getInstance().getXAResourceLookup();
+            PersistenceManagerWrapper pm = MapStoreConfig.getInstance().getPersistenceResourceLookup();
             Transaction t = tm.getTransactionManager().getTransaction();
             for (ResourceManagerWrapper r : resources) {
                 r.create(item, t);
             }
+            pm.create(item, t);
             return idItem;
         } catch (SystemException ex) {
             Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);
@@ -180,12 +184,9 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         }
     }
 
-    private static int id;
-
     private long initializateId() {
-        //TODO: Cambiar esto por algo que use BBDD. SINCRONIZAR!!!!!
-        id++;
-        return id;
+        PersistenceManagerWrapper pm = MapStoreConfig.getInstance().getPersistenceResourceLookup();
+        return pm.getNewId();
     }
 
 

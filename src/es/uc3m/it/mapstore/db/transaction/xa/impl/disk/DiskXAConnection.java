@@ -16,9 +16,11 @@ import javax.sql.XAConnection;
  */
 public class DiskXAConnection implements XAConnection{
     private DiskXAResource resource;
+    private String path;
 
     public DiskXAConnection(String path) {
-        resource = new DiskXAResource();
+        resource = new DiskXAResource(path);
+        this.path = path;
     }
 
     @Override
@@ -28,7 +30,9 @@ public class DiskXAConnection implements XAConnection{
 
     @Override
     public DiskConnection getConnection() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
+        DiskConnection conn = new DiskConnection(path);
+        resource.addConnection(conn);
+        return conn;
     }
 
     @Override

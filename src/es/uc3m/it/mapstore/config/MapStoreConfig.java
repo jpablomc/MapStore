@@ -5,6 +5,7 @@
 package es.uc3m.it.mapstore.config;
 
 import es.uc3m.it.mapstore.db.transaction.TransactionManagerWrapper;
+import es.uc3m.it.mapstore.db.transaction.xa.PersistenceManagerWrapper;
 import es.uc3m.it.mapstore.db.transaction.xa.ResourceManagerWrapper;
 import es.uc3m.it.mapstore.exception.MapStoreRunTimeException;
 import es.uc3m.it.mapstore.transformers.factory.TransformerFactory;
@@ -131,6 +132,7 @@ public class MapStoreConfig {
     private void createConfigObjects() {
         //Localizar el txManager
         registerDBResources();
+        registerPersistenceResource();
         registerTransactionManager();
         registerTypesAssociation();
         registerTransformerFactory();
@@ -174,6 +176,16 @@ public class MapStoreConfig {
            }
        }
        properties.setProperty(RESOURCE_LOOKUP, resources);
+    }
+
+    private void registerPersistenceResource(){
+       String key = PERSISTANCE_PATH;
+       HierarchicalConfiguration sub = properties.configurationAt(key);
+       Map<String,ResourceManagerWrapper> resources = new HashMap<String,ResourceManagerWrapper>();
+       String f = sub.getString(XA_FACTORY);
+       PersistenceManagerWrapper pm = (PersistenceManagerWrapper) createInstance(PersistenceManagerWrapper.class, f, null, null);
+       pm.start(ConfigurationConverter.getProperties(sub));
+       properties.setProperty(PERSISTANCE_LOOKUP, pm);
     }
 
     private void registerTypesAssociation() {
@@ -268,6 +280,10 @@ public class MapStoreConfig {
     public Collection<ResourceManagerWrapper> getXAResourceLookup() {
         Map<String,ResourceManagerWrapper> res = (Map<String,ResourceManagerWrapper>)properties.getProperty(RESOURCE_LOOKUP);
         return res.values();
+    }
+
+    public PersistenceManagerWrapper getPersistenceResourceLookup() {
+        return (PersistenceManagerWrapper) properties.getProperty(PERSISTANCE_LOOKUP);
     }
 
     private class ClassResourceType {

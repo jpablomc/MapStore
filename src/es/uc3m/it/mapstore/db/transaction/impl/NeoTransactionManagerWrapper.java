@@ -7,6 +7,7 @@ package es.uc3m.it.mapstore.db.transaction.impl;
 
 import es.uc3m.it.mapstore.db.transaction.*;
 import es.uc3m.it.mapstore.config.MapStoreConfig;
+import es.uc3m.it.mapstore.db.transaction.xa.PersistenceManagerWrapper;
 import es.uc3m.it.mapstore.db.transaction.xa.ResourceManagerWrapper;
 import es.uc3m.it.mapstore.db.transaction.xa.impl.neo.NeoXAResourceWrapper;
 import java.io.File;
@@ -49,12 +50,17 @@ public class NeoTransactionManagerWrapper implements TransactionManagerWrapper {
 
     private void registerDataSources() {
         Collection<ResourceManagerWrapper> resources = MapStoreConfig.getInstance().getXAResourceLookup();
+        PersistenceManagerWrapper pm = MapStoreConfig.getInstance().getPersistenceResourceLookup();
         for (ResourceManagerWrapper r : resources) {
             Map<String,Object> parameters = new HashMap<String,Object>();
             parameters.put(NeoXAResourceWrapper.WRAPPED_OBJECT, r);
             tm.registerDataSource(r.getName(), NeoXAResourceWrapper.class.getName(),
                     r.getName().getBytes(), parameters);
         }
+        Map<String,Object> parameters = new HashMap<String,Object>();
+        parameters.put(NeoXAResourceWrapper.WRAPPED_OBJECT, pm);
+        tm.registerDataSource("persistence", NeoXAResourceWrapper.class.getName(),
+                "persistence".getBytes(), parameters);
     }
 
     @Override

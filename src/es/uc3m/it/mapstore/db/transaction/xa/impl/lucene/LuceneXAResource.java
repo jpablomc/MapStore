@@ -6,6 +6,7 @@
 package es.uc3m.it.mapstore.db.transaction.xa.impl.lucene;
 
 import es.uc3m.it.mapstore.db.transaction.xa.impl.AbstractXAResource;
+import es.uc3m.it.mapstore.exception.MapStoreRunTimeException;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -40,20 +41,23 @@ public class LuceneXAResource extends AbstractXAResource {
     private Map<Xid,Set<LuceneConnection>> connections;
     private String path;
 
-    public LuceneXAResource(String path) throws SQLException {
+    public LuceneXAResource(String path) {
         connections = new HashMap<Xid, Set<LuceneConnection>>();
         this.path = path;
         try {
             recoverPrepared();
+        } catch (SQLException ex) {
+            Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
         } catch (IOException ex) {
             Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
-            throw new SQLException(ex);
+            throw new MapStoreRunTimeException(ex);
         } catch (ClassNotFoundException ex) {
             Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
-            throw new SQLException(ex);
+            throw new MapStoreRunTimeException(ex);
         } catch (XAException ex) {
             Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
-            throw new SQLException(ex);
+            throw new MapStoreRunTimeException(ex);
         }
     }
 
@@ -162,7 +166,7 @@ public class LuceneXAResource extends AbstractXAResource {
         if (!aux.equals(xid)) sb.append(aux).append(System.getProperty("line.separator"));
     }
     br.close();
-    BufferedWriter bw = new BufferedWriter(new FileWriter(f, true));
+    BufferedWriter bw = new BufferedWriter(new FileWriter(f));
     bw.write(sb.toString());
     bw.close();
   }
@@ -183,7 +187,13 @@ public class LuceneXAResource extends AbstractXAResource {
     private String getXidFile(Xid arg0) throws XAException {
         String sb;
         try {
-            sb = new StringBuffer(arg0.getFormatId()).append("|").append(getHexString(arg0.getGlobalTransactionId())).append("|").append(getHexString(arg0.getBranchQualifier())).toString();
+            StringBuffer aux = new StringBuffer();
+            aux.append(arg0.getFormatId());
+            aux.append("_");
+            aux.append(getHexString(arg0.getGlobalTransactionId()));
+            aux.append("_");
+            aux.append(getHexString(arg0.getBranchQualifier()));
+            sb = aux.toString();
         } catch (UnsupportedEncodingException ex) {
             Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
             throw new XAException(XAException.XAER_RMERR);
@@ -192,7 +202,7 @@ public class LuceneXAResource extends AbstractXAResource {
     }
 
     private Xid getXidFromString(String arg0) throws XAException {
-        String[] token = arg0.split("|");
+        String[] token = arg0.split("_");
         int formatId = Integer.valueOf(token[0]);
         byte[] global = new byte[token[1].length()/2];
         for (int i= 0;i<global.length;i++) {
@@ -209,43 +219,47 @@ public class LuceneXAResource extends AbstractXAResource {
 
     private void recoverPrepared() throws IOException, ClassNotFoundException, SQLException, XAException {
         File f = new File(path + System.getProperty("file.separator") + LUCENE_TX);
-        BufferedReader br = null;
-        try {
-            List<Xid> xids = new ArrayList<Xid>();
-            br = new BufferedReader(new FileReader(f));
-            while (br.ready()) {
-                //Cada linea contiene el nombre del fichero a procesar
-                String aux = br.readLine();
-                //Deserializar el contenido
-                File faux = new File(path + System.getProperty("file.separator") + aux);
-                List<LuceneOperation> ops = deserializeOperations(faux);
-                //Ejecutar las operaciones
-                LuceneConnection conn = new LuceneConnection(path);
-                Xid xid = getXidFromString(aux);
-                Set<LuceneConnection> connSet = new HashSet<LuceneConnection>();
-                connSet.add(conn);
-                connections.put(xid, connSet);
-                for (LuceneOperation op : ops) {
-                    Object[] params = op.getParameters();
-                    switch (op.getOperation()) {
-                        case LuceneOperation.CREATE:
-                            conn.indexNew((Long)params[0],(String)params[1],params[2]);
-                            break;
-                        case LuceneOperation.UPDATE:
-                            conn.index((Long)params[0],(String)params[1],params[2]);
-                            break;
-                        case LuceneOperation.DELETE:
-                            conn.delete((Long)params[0]);
-                            break;
+        if (f.exists()) {
+            BufferedReader br = null;
+            try {
+                List<Xid> xids = new ArrayList<Xid>();
+                br = new BufferedReader(new FileReader(f));
+                while (br.ready()) {
+                    //Cada linea contiene el nombre del fichero a procesar
+                    String aux = br.readLine();
+                    //Deserializar el contenido
+                    File faux = new File(path + System.getProperty("file.separator") + aux);
+                    List<LuceneOperation> ops = deserializeOperations(faux);
+                    //Ejecutar las operaciones
+                    LuceneConnection conn = new LuceneConnection(path);
+                    Xid xid = getXidFromString(aux);
+                    Set<LuceneConnection> connSet = new HashSet<LuceneConnection>();
+                    connSet.add(conn);
+                    connections.put(xid, connSet);
+                    for (LuceneOperation op : ops) {
+                        Object[] params = op.getParameters();
+                        switch (op.getOperation()) {
+                            case LuceneOperation.CREATE:
+                                conn.indexNew((Long) params[0], (String) params[1], params[2]);
+                                break;
+                            case LuceneOperation.UPDATE:
+                                conn.index((Long) params[0], (String) params[1], params[2]);
+                                break;
+                            case LuceneOperation.DELETE:
+                                conn.delete((Long) params[0]);
+                                break;
+                        }
                     }
+                    //Ejecutar el prepare
+                    conn.prepare();
+                    xids.add(xid);
                 }
-                //Ejecutar el prepare
-                conn.prepare();
-                xids.add(xid);
+                setPreparedForRecover(xids);
+            } finally {
+                if (br != null) {
+                    br.close();
+                }
             }
-            setPreparedForRecover(xids);
-        } finally {
-            if (br != null) br.close();
         }
     }
 

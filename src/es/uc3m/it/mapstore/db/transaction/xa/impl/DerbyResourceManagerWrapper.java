@@ -123,6 +123,7 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
         try {
             boolean result;
             long id = item.getId();
+            long version = item.getVersion();
             List<String> props = getPropertiesToProcess(item);
             XAConnection connXA = ds.getXAConnection();
             XAResource r = connXA.getXAResource();
@@ -131,7 +132,7 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
             if (!result) throw new MapStoreRunTimeException("Can not enlist resource in transaction");
             for (String property : props) {
                 Object value = item.getProperty(property);
-                String sql = dialect.create(id, property, value);
+                String sql = dialect.create(id, version, property, value);
                 PreparedStatement ps;
                 ps = conn.prepareStatement(sql);
                 ps.executeUpdate();

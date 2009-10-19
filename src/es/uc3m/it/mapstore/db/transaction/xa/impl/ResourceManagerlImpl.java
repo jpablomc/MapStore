@@ -153,6 +153,8 @@ public abstract class ResourceManagerlImpl implements ResourceManagerWrapper{
     
 
     protected boolean processable(String prop) {
-        return true;
+        boolean toProcess = true;
+        if (MapStoreItem.VERSION.equals(prop)) toProcess = false;
+        return toProcess;
     }
 }

@@ -31,24 +31,24 @@ public class SQLDialect implements MapStoreDialect {
     }
 
     @Override
-    public String create(long id, String key, Object value) {
+    public String create(long id, long version, String key, Object value) {
         String aux;
         if (value instanceof Integer) {
-            aux = generateInsertorUpdateSQL(id, key, (Integer)value,false);
+            aux = generateInsertorUpdateSQL(id, version, key, (Integer)value,false);
         } else if (value instanceof Long) {
-            aux = generateInsertorUpdateSQL(id, key, (Long)value,false);
+            aux = generateInsertorUpdateSQL(id, version, key, (Long)value,false);
         } else {
-            aux =  generateInsertorUpdateSQL(id, key, value,false);
+            aux =  generateInsertorUpdateSQL(id, version, key, value,false);
         }
         return aux;
     }
 
     public String insertTypeName(long id, String type, String name) {
-        return "INSERT INTO NAME(ID,TYPE,NAME) VALUES("+id+", '"+ type + "', '" + name +"'";
+        return "INSERT INTO NAME(ID,TYPE,NAME) VALUES("+id+", '"+ type + "', '" + name +"')";
     }
 
     @Override
-    public Serializable update(long id, String key, Object value) {
+    public Serializable update(long id, long version, String key, Object value) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
@@ -57,39 +57,39 @@ public class SQLDialect implements MapStoreDialect {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    private String generateInsertorUpdateSQL(long id , String property, Integer value,boolean update) {
+    private String generateInsertorUpdateSQL(long id , long version, String property, Integer value,boolean update) {
         String sql;
         if (!update) {
-            sql = "INSERT INTO INTEGERS(ID,PROPERTY,VALUE) VALUES("+id+", '"+ property + "', " + value+")";
+            sql = "INSERT INTO INTEGERS(ID,VERSION,PROPERTY,VALUE) VALUES("+id+", "+version +", '"+ property + "', " + value+")";
         } else {
-            sql = "UPDATE INTEGERS SET VALUE = " + value + " WHERE ID = " + id + " AND PROPERTY = " + property + ";";
+            sql = "UPDATE INTEGERS SET VALUE = " + value + " WHERE ID = " + id + " AND VERSION = "+ version +" AND PROPERTY = " + property + ";";
         }
         return sql;
     }
 
-    private String generateInsertorUpdateSQL(long id , String property, Long value,boolean update) {
+    private String generateInsertorUpdateSQL(long id , long version, String property, Long value,boolean update) {
         String sql;
         if (!update) {
-            sql = "INSERT INTO LONGS(ID,PROPERTY,VALUE) VALUES("+id+", '"+ property + "', " + value+")";
+            sql = "INSERT INTO LONGS(ID,VERSION,PROPERTY,VALUE) VALUES("+id+", "+version +", '"+ property + "', " + value+")";
         } else {
-            sql = "UPDATE LONGS SET VALUE = " + value + " WHERE ID = " + id + " AND PROPERTY = " + property + ";";
+            sql = "UPDATE LONGS SET VALUE = " + value + " WHERE ID = " + id + " AND VERSION = "+ version +" AND PROPERTY = " + property + ";";
         }
         return sql;
     }
 
-    private String generateInsertorUpdateSQL(long id , String property, Float value,boolean update) {
+    private String generateInsertorUpdateSQL(long id , long version, String property, Float value,boolean update) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    private String generateInsertorUpdateSQL(long id , String property, Double value,boolean update) {
+    private String generateInsertorUpdateSQL(long id , long version, String property, Double value,boolean update) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    private String generateInsertorUpdateSQL(long id , String property, Date value,boolean update) {
+    private String generateInsertorUpdateSQL(long id , long version, String property, Date value,boolean update) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
-    private String generateInsertorUpdateSQL(long id , String property, Object value,boolean update) {
+    private String generateInsertorUpdateSQL(long id , long version, String property, Object value,boolean update) {
         throw new UnsupportedOperationException("Not supported yet.");
     }
 

@@ -19,6 +19,7 @@ public class MapStoreItem implements Serializable{
     public final static String NAME = "_NAME";
     public final static String ID = "_ID";
     public final static String TYPE = "_TYPE";
+    public final static String VERSION = "_VERSION";
 
     Map<String,Object> properties;
 
@@ -76,6 +77,23 @@ public class MapStoreItem implements Serializable{
         //TODO: Loguear el cambio cuando se modifique el valor... posiblemente
         //pueda llevar a problemas al ejecutar un update
         properties.put(ID, value);
+    }
+
+    /**
+     * Devuelve la versión del objeto
+     *
+     * @return
+     */
+    public int getVersion() {
+        return (Integer)properties.get(VERSION);
+    }
+    /**
+     * Establece la versión del objeto
+     *
+     * @param value Nuevo valor de versión del objeto
+     */
+    public void setVersion(int value) {
+        properties.put(VERSION, value);
     }
 
     /**

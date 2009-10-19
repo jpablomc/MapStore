@@ -37,7 +37,7 @@ public class DiskConnection extends AbstractConnection {
     private String path;
     private Map<File,ByteArrayOutputStream> data;
     private List<File> dataDelete;
-    private Set<Long> locked;
+    private Map<Long,Set<Long>> locked;
     private boolean autocommit;
     List<DiskOperation> operations;
 
@@ -46,7 +46,7 @@ public class DiskConnection extends AbstractConnection {
         data = new HashMap<File,ByteArrayOutputStream>();
         dataDelete = new ArrayList<File>();
         autocommit = false;
-        locked = new HashSet<Long>();
+        locked = new HashMap<Long,Set<Long>>();
         operations = new ArrayList<DiskOperation>();
     }
 
@@ -64,6 +64,7 @@ public class DiskConnection extends AbstractConnection {
     public void commit() throws SQLException {
         for (File f : data.keySet()) {
             try {
+                checkPath(f.getParent());
                 ByteArrayOutputStream bos = data.get(f);
                 bos.writeTo(new FileOutputStream(f));
             } catch (FileNotFoundException ex) {
@@ -77,38 +78,50 @@ public class DiskConnection extends AbstractConnection {
         for (File f : dataDelete) {
             f.delete();
         }
-        for (Long l: locked) {
-            DiskLock.releaseLock(l);
+        for (Long id: locked.keySet()) {
+            for (Long version : locked.get(id)) {
+                DiskLock.releaseLock(id,version);
+            }
         }
     }
 
-    private void acquireLock(Long id) throws SQLException {
-        DiskLock.acquireLock(id);
-        locked.add(id);
+    private void acquireLock(long id,long version) throws SQLException {
+        DiskLock.acquireLock(id,version);
+        Set<Long> versions = locked.get(id);
+        if (versions == null) {
+            versions = new HashSet<Long>();
+            locked.put(id, versions);
+        }
+        versions.add(version);
     }
 
     public void storeNew(MapStoreItem i) throws SQLException, IOException {
         long id = i.getId();
-        acquireLock(id);
-        File f = getLastVersion(id);
-        if (f != null) throw new SQLException("Item already exist");
+        long version = i.getVersion();
+        acquireLock(id,version);
+        String file = getPath(id) + System.getProperty("file.separator") + version;
+        File f = new File(file);
+        if (f.exists()) throw new SQLException("Item already exist");
         MapStoreItem toRecord = eliminateNonPrimitive(i);
-        serialize(getInitialVersion(id), toRecord);
+        serialize(f, toRecord);
         operations.add(new DiskOperation(DiskOperation.CREATE, new Object[]{i}));
     }
 
     public void store(MapStoreItem i) throws SQLException, IOException {
         long id = i.getId();
-        acquireLock(id);
-        File f = getNextVersion(id);
-        if (f == null) throw new SQLException("Item can not be updated: Item does not exist");
+        long version = i.getVersion();
+        acquireLock(id,version);
+        String file = getPath(id) + System.getProperty("file.separator") + version;
+        File f = new File(file);
+        if (!f.exists()) throw new SQLException("Item can not be updated: Item does not exist");
         MapStoreItem toRecord = eliminateNonPrimitive(i);
         serialize(f, toRecord);
         operations.add(new DiskOperation(DiskOperation.UPDATE, new Object[]{i}));
     }
 
-    public void delete(long id) throws SQLException {
-        acquireLock(id);
+    public void delete(long id,long version) throws SQLException {
+        /*
+        acquireLock(id,version);
         List<File> files = getAllVersions(id);
         if (files.isEmpty()) throw new SQLException("Item can not be deleted: Item does not exist");
         for (File aux : files) {
@@ -122,7 +135,8 @@ public class DiskConnection extends AbstractConnection {
         } else {
             dataDelete.addAll(files);
         }
-        operations.add(new DiskOperation(DiskOperation.DELETE, new Object[]{id}));
+        */
+        operations.add(new DiskOperation(DiskOperation.DELETE, new Object[]{id,version}));
     }
 
     public List<MapStoreItem> getById(List<Long> ids) throws SQLException {
@@ -210,10 +224,10 @@ public class DiskConnection extends AbstractConnection {
         return Arrays.asList(f.listFiles());
     }
 
-    private File getInitialVersion(long id) {
-        return new File(getPath(id) + System.getProperty("file.separator") +
-                "0");
-    }
+//    private File getInitialVersion(long id) {
+//        return new File(getPath(id) + System.getProperty("file.separator") +
+//                "0");
+//    }
 
     private File getLastVersion(long id) {
         List<File> files = getAllVersions(id);
@@ -229,7 +243,7 @@ public class DiskConnection extends AbstractConnection {
         }
         return aux;
     }
-
+/*
     private File getNextVersion(long id) {
         List<File> files = getAllVersions(id);
         long vMax = Long.MIN_VALUE;
@@ -245,20 +259,33 @@ public class DiskConnection extends AbstractConnection {
                 System.getProperty("file.separator") + (vMax+1));
         return aux;
     }
-
+*/
     private String getPath(long id) {
         String sep = System.getProperty("file.separator");
         StringBuffer sb = new StringBuffer(Long.toHexString(id));
         StringBuffer zeros = new StringBuffer();
         while (zeros.length()+sb.length()<16) zeros.append("0");
         String aux = zeros.toString() + sb.toString();
-        return path + sep + aux.substring(0, 1) + sep + aux.substring(2, 3)
-                + sep + aux.substring(4, 5) + sep + aux.substring(6, 7)
-                + sep + aux.substring(8, 9) + sep + aux.substring(10, 11)
-                + sep + aux.substring(12, 13) + sep + aux.substring(14, 15);
+        return path + sep + aux.substring(0, 2) + sep + aux.substring(2, 4)
+                + sep + aux.substring(4, 6) + sep + aux.substring(6, 8)
+                + sep + aux.substring(8, 10) + sep + aux.substring(10, 12)
+                + sep + aux.substring(12, 14) + sep + aux.substring(14, 16);
     }
 
     public List<DiskOperation> getOperations() {
         return operations;
+    }
+
+    @Override
+    public boolean getAutoCommit() throws SQLException {
+        return autocommit;
+    }
+
+    private void checkPath(String path) {
+        File f = new File(path);
+        if (!f.exists()) {
+            checkPath(f.getParent());
+            f.mkdir();
+        }
     }
 }

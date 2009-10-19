@@ -30,8 +30,7 @@ public class Main {
 
     private MapStoreItem generateMapTStoreItemExample() {
         MapStoreItem item = new MapStoreItem();
-        item.setId(1);
-        item.setName("Prueba");
+        item.setName("Prueba2");
         item.setType("Any");
         item.setProperty("prop1", Long.valueOf("10"));
         item.setProperty("prop2", Integer.valueOf("10"));

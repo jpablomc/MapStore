@@ -37,7 +37,7 @@
             <prop></prop>
         </xa>
         <persistance>
-            <factory></factory>
+            <factory>es.uc3m.it.mapstore.db.transaction.xa.impl.disk.DiskPersistenceManagerWrapper</factory>
         </persistance>
     </transaction>
     <types>

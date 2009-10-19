@@ -22,14 +22,14 @@ import javax.transaction.xa.Xid;
  * @author Pablo
  */
 public abstract class AbstractXAResource implements XAResource{
-    private static int DEFAULT_TIMEOUT = 120;
-    private static Map<Thread,XidImpl> threads = new HashMap<Thread,XidImpl>();;
-    private static Map<XidImpl,Set<Thread>> xidActive = new HashMap<XidImpl,Set<Thread>>();;
-    private static Set<XidImpl> xidSuspended = new HashSet<XidImpl>();
-    private static Set<XidImpl> xidSuccess = new HashSet<XidImpl>();
-    private static Set<XidImpl> xidPrepared = new HashSet<XidImpl>();
-    private static Set<XidImpl> xidFailed = new HashSet<XidImpl>();
-    private static final Semaphore s = new Semaphore(1);
+    private int DEFAULT_TIMEOUT = 120;
+    private Map<Thread,XidImpl> threads = new HashMap<Thread,XidImpl>();;
+    private Map<XidImpl,Set<Thread>> xidActive = new HashMap<XidImpl,Set<Thread>>();;
+    private Set<XidImpl> xidSuspended = new HashSet<XidImpl>();
+    private Set<XidImpl> xidSuccess = new HashSet<XidImpl>();
+    private Set<XidImpl> xidPrepared = new HashSet<XidImpl>();
+    private Set<XidImpl> xidFailed = new HashSet<XidImpl>();
+    private final Semaphore s = new Semaphore(1);
 
 
     @Override

@@ -5,6 +5,7 @@
 
 package es.uc3m.it.mapstore.db.transaction.xa.impl.disk;
 
+import java.io.File;
 import java.io.PrintWriter;
 import java.sql.SQLException;
 import javax.sql.XAConnection;
@@ -15,10 +16,18 @@ import javax.sql.XADataSource;
  * @author Pablo
  */
 public class DiskXADataSource implements XADataSource{
+    String path;
+    DiskXAConnection xaconn;
+
+    public DiskXADataSource(String path) {
+        checkPath(path);
+        this.path = path;
+        xaconn = new DiskXAConnection(path);
+    }
 
     @Override
-    public DiskXAConnection getXAConnection() throws SQLException {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public DiskXAConnection getXAConnection(){
+        return xaconn;
     }
 
     @Override
@@ -44,6 +53,14 @@ public class DiskXADataSource implements XADataSource{
     @Override
     public int getLoginTimeout() throws SQLException {
         throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    private void checkPath(String path) {
+        File f = new File(path);
+        if (!f.exists()) {
+            checkPath(f.getParent());
+            f.mkdir();
+        }
     }
 
 }

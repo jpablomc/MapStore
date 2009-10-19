@@ -6,6 +6,7 @@ package es.uc3m.it.mapstore.db.transaction.xa.impl.disk;
 
 import es.uc3m.it.mapstore.bean.MapStoreItem;
 import es.uc3m.it.mapstore.db.transaction.xa.impl.AbstractXAResource;
+import es.uc3m.it.mapstore.exception.MapStoreRunTimeException;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -41,20 +42,23 @@ public class DiskXAResource extends AbstractXAResource {
     private Map<Xid, Set<DiskConnection>> connections;
     private String path;
 
-    public DiskXAResource(String path) throws SQLException {
+    public DiskXAResource(String path) {
         connections = new HashMap<Xid, Set<DiskConnection>>();
         this.path = path;
         try {
             recoverPrepared();
+        } catch (SQLException ex) {
+            Logger.getLogger(DiskXAResource.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
         } catch (IOException ex) {
             Logger.getLogger(DiskXAResource.class.getName()).log(Level.SEVERE, null, ex);
-            throw new SQLException(ex);
+            throw new MapStoreRunTimeException(ex);
         } catch (ClassNotFoundException ex) {
             Logger.getLogger(DiskXAResource.class.getName()).log(Level.SEVERE, null, ex);
-            throw new SQLException(ex);
+            throw new MapStoreRunTimeException(ex);
         } catch (XAException ex) {
             Logger.getLogger(DiskXAResource.class.getName()).log(Level.SEVERE, null, ex);
-            throw new SQLException(ex);
+            throw new MapStoreRunTimeException(ex);
         }
     }
 
@@ -157,7 +161,7 @@ public class DiskXAResource extends AbstractXAResource {
             }
         }
         br.close();
-        BufferedWriter bw = new BufferedWriter(new FileWriter(f, true));
+        BufferedWriter bw = new BufferedWriter(new FileWriter(f));
         bw.write(sb.toString());
         bw.close();
     }
@@ -165,7 +169,8 @@ public class DiskXAResource extends AbstractXAResource {
     private String getXidFile(Xid arg0) throws XAException {
         String sb;
         try {
-            sb = new StringBuffer(arg0.getFormatId()).append("|").append(getHexString(arg0.getGlobalTransactionId())).append("|").append(getHexString(arg0.getBranchQualifier())).toString();
+            StringBuffer aux = new StringBuffer();
+            sb = aux.append(arg0.getFormatId()).append("_").append(getHexString(arg0.getGlobalTransactionId())).append("_").append(getHexString(arg0.getBranchQualifier())).toString();
         } catch (UnsupportedEncodingException ex) {
             Logger.getLogger(DiskXAResource.class.getName()).log(Level.SEVERE, null, ex);
             throw new XAException(XAException.XAER_RMERR);
@@ -193,43 +198,47 @@ public class DiskXAResource extends AbstractXAResource {
 
     private void recoverPrepared() throws IOException, ClassNotFoundException, SQLException, XAException {
         File f = new File(path + System.getProperty("file.separator") + DISK_TX);
-        BufferedReader br = null;
-        try {
-            List<Xid> xids = new ArrayList<Xid>();
-            br = new BufferedReader(new FileReader(f));
-            while (br.ready()) {
-                //Cada linea contiene el nombre del fichero a procesar
-                String aux = br.readLine();
-                //Deserializar el contenido
-                File faux = new File(path + System.getProperty("file.separator") + aux);
-                List<DiskOperation> ops = deserializeOperations(faux);
-                //Ejecutar las operaciones
-                DiskConnection conn = new DiskConnection(path);
-                Xid xid = getXidFromString(aux);
-                Set<DiskConnection> connSet = new HashSet<DiskConnection>();
-                connSet.add(conn);
-                connections.put(xid, connSet);
-                for (DiskOperation op : ops) {
-                    Object[] params = op.getParameters();
-                    switch (op.getOperation()) {
-                        case DiskOperation.CREATE:
-                            conn.storeNew((MapStoreItem)params[0]);
-                            break;
-                        case DiskOperation.UPDATE:
-                            conn.store((MapStoreItem)params[0]);
-                            break;
-                        case DiskOperation.DELETE:
-                            conn.delete((Long)params[0]);
-                            break;
+        if (f.exists()) {
+            BufferedReader br = null;
+            try {
+                List<Xid> xids = new ArrayList<Xid>();
+                br = new BufferedReader(new FileReader(f));
+                while (br.ready()) {
+                    //Cada linea contiene el nombre del fichero a procesar
+                    String aux = br.readLine();
+                    //Deserializar el contenido
+                    File faux = new File(path + System.getProperty("file.separator") + aux);
+                    List<DiskOperation> ops = deserializeOperations(faux);
+                    //Ejecutar las operaciones
+                    DiskConnection conn = new DiskConnection(path);
+                    Xid xid = getXidFromString(aux);
+                    Set<DiskConnection> connSet = new HashSet<DiskConnection>();
+                    connSet.add(conn);
+                    connections.put(xid, connSet);
+                    for (DiskOperation op : ops) {
+                        Object[] params = op.getParameters();
+                        switch (op.getOperation()) {
+                            case DiskOperation.CREATE:
+                                conn.storeNew((MapStoreItem) params[0]);
+                                break;
+                            case DiskOperation.UPDATE:
+                                conn.store((MapStoreItem) params[0]);
+                                break;
+                            case DiskOperation.DELETE:
+                                conn.delete((Long) params[0], (Long) params[1]);
+                                break;
+                        }
                     }
+                    //Ejecutar el prepare
+                    conn.prepare();
+                    xids.add(xid);
                 }
-                //Ejecutar el prepare
-                conn.prepare();
-                xids.add(xid);
+                setPreparedForRecover(xids);
+            } finally {
+                if (br != null) {
+                    br.close();
+                }
             }
-            setPreparedForRecover(xids);
-        } finally {
-            if (br != null) br.close();
         }
     }
 
@@ -261,7 +270,7 @@ public class DiskXAResource extends AbstractXAResource {
     }
     
     private Xid getXidFromString(String arg0) throws XAException {
-        String[] token = arg0.split("|");
+        String[] token = arg0.split("_");
         int formatId = Integer.valueOf(token[0]);
         byte[] global = new byte[token[1].length()/2];
         for (int i= 0;i<global.length;i++) {
