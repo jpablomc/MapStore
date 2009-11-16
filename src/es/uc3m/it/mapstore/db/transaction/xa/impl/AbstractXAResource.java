@@ -159,7 +159,7 @@ public abstract class AbstractXAResource implements XAResource{
 
     @Override
     public void rollback(Xid arg0) throws XAException {
-        throw new UnsupportedOperationException("Not supported yet.");
+        doRollback(arg0);
     }
 
     @Override
@@ -213,7 +213,13 @@ public abstract class AbstractXAResource implements XAResource{
                         throw new XAException(XAException.XAER_PROTO);
                     }
                     if (!xidActive.containsKey(xid)) {
-                        throw new XAException(XAException.XAER_NOTA);
+                        if (xidSuccess.contains(xid)) {
+                            //Permitimos reactivar una exitosa
+                            thr.add(t);
+                            xidActive.put(xid, thr);
+                            threads.put(t, xid);
+                            xidSuccess.remove(xid);
+                        } else throw new XAException(XAException.XAER_NOTA);
                     }
                     thr = xidActive.get(xid);
                     thr.add(t);

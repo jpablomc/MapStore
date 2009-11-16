@@ -18,26 +18,26 @@ import java.util.Map;
  */
 public class IdGenerator {
     private String path;
-    private long lastID;
-    private Map<Long,Long> lastVersion;
+    private int lastID;
+    private Map<Integer,Integer> lastVersion;
 
     public IdGenerator(String path) {
         lastID = initLastId(path);
-        lastVersion = new HashMap<Long,Long>();
+        lastVersion = new HashMap<Integer,Integer>();
     }
 
-    public synchronized long getNewId() {
-        long result = lastID++;
+    public synchronized int getNewId() {
+        int result = lastID++;
         getNewVersion(result);
         return result;
     }
 
-    public synchronized long getNewVersion(long id) {
-        Long version = lastVersion.get(id);
+    public synchronized int getNewVersion(int id) {
+        Integer version = lastVersion.get(id);
         if (version == null) {
             version = getLastVersion(id);
         }
-        lastVersion.put(id, ++version);
+        lastVersion.put(id, version++);
         return version;
     }
 
@@ -59,8 +59,8 @@ public class IdGenerator {
     }
 
 
-    private long initLastId(String path) {
-        int depth = 8;
+    private int initLastId(String path) {
+        int depth = 4;
         String aux = path;
         int[] id = new int[depth];
         while (depth > 0) {            
@@ -73,7 +73,7 @@ public class IdGenerator {
             aux = aux + System.getProperty("file.separator") + hex;
             depth--;
         }
-        long result = 0;
+        int result = 0;
         for (int i = id.length-1; i>=0;i--) {
             result = result*256 + id[i];
         }
@@ -98,13 +98,13 @@ public class IdGenerator {
         }
     }
     
-    private long getLastVersion(long id) {
+    private int getLastVersion(long id) {
         List<File> files = getAllVersions(id);
         File aux = null;
-        long vMax = Long.MIN_VALUE;
+        int vMax = Integer.MIN_VALUE;
         for (File f : files) {
             String version = f.getName();
-            long v = Long.valueOf(version);
+            int v = Integer.valueOf(version);
             if (aux == null || v>vMax) {
                 aux = f;
                 vMax = v;

@@ -7,11 +7,14 @@ package es.uc3m.it.mapstore.db.transaction.xa.impl.lucene;
 
 import es.uc3m.it.mapstore.bean.MapStoreCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
+import es.uc3m.it.mapstore.bean.MapStoreResult;
 import es.uc3m.it.mapstore.db.transaction.xa.impl.ResourceManagerlImpl;
 import es.uc3m.it.mapstore.exception.MapStoreRunTimeException;
 import java.io.File;
 import java.sql.SQLException;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -75,7 +78,7 @@ public class LuceneResourceManagerWrapper extends ResourceManagerlImpl {
             LuceneConnection conn = xaconn.getConnection();
             for (String property : props) {
                 Object o = item.getProperty(property);
-                conn.indexNew(id, property, o);
+                conn.indexNew(id, item.getVersion(), property, o);
             }
             enlisted = !(t.delistResource(res, XAResource.TMSUCCESS));          
         } catch (RollbackException ex) {
@@ -106,18 +109,25 @@ public class LuceneResourceManagerWrapper extends ResourceManagerlImpl {
     }
 
     @Override
-    public void delete(long id, Transaction t) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public void delete(MapStoreItem item, MapStoreItem old, Transaction t) {
+        create(item, t);
     }
 
     @Override
-    public List<Long> findByConditions(List<MapStoreCondition> cond) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public Map<Integer,MapStoreResult> findByConditions(List<MapStoreCondition> cond, int flag, Date fecha) {
+        LuceneConnection conn;
+        try {
+            conn = ds.getXAConnection().getConnection();
+            return conn.findByConditions(cond, flag, fecha);
+        } catch (SQLException ex) {
+            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
+        }
     }
 
     @Override
-    public void update(MapStoreItem item, Transaction t) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public void update(MapStoreItem item, MapStoreItem old, Transaction t) {
+        create(item, t);
     }
 
     @Override
@@ -138,6 +148,14 @@ public class LuceneResourceManagerWrapper extends ResourceManagerlImpl {
         }
     }
 
+    @Override
+    public boolean canFindByNameType() {
+        return false;
+    }
 
+    @Override
+    public Integer findByNameType(String name, String type) {
+        throw new UnsupportedOperationException("Resource does not support search by name/type");
+    }
 
 }

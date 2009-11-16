@@ -27,8 +27,8 @@ public abstract class ResourceManagerlImpl implements ResourceManagerWrapper{
         List<String> props = new ArrayList<String>();
         Map<Class,List<ResourceManagerWrapper>> mapa = new HashMap<Class,List<ResourceManagerWrapper>>();
         for (String prop :item.getProperties().keySet()) {
-            if (processable(prop)) {
-                Object value = item.getProperty(prop);
+            Object value = item.getProperty(prop);
+            if (processable(prop) && (value != null)) {
                 List<ResourceManagerWrapper> lista = mapa.get(value.getClass());
                 if (lista == null) {
                     lista = MapStoreConfig.getInstance().getXaResourceLookupForClass(value.getClass());
@@ -152,9 +152,11 @@ public abstract class ResourceManagerlImpl implements ResourceManagerWrapper{
     }
     
 
+    public static String NONPROCESSABLE = "_IGNORE_";
+
     protected boolean processable(String prop) {
         boolean toProcess = true;
-        if (MapStoreItem.VERSION.equals(prop)) toProcess = false;
+        if (prop.startsWith(NONPROCESSABLE)) toProcess = false;
         return toProcess;
     }
 }

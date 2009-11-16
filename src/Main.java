@@ -1,6 +1,16 @@
 
+import es.uc3m.it.mapstore.bean.MapStoreCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
+import es.uc3m.it.mapstore.bean.annotations.Name;
 import es.uc3m.it.mapstore.db.impl.MapStoreSession;
+import es.uc3m.it.mapstore.parser.TextToNumber;
+import es.uc3m.it.mapstore.transformers.exception.UnTransformableException;
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.store.LockObtainFailedException;
 
 /*
  * To change this template, choose Tools | Templates
@@ -12,40 +22,143 @@ import es.uc3m.it.mapstore.db.impl.MapStoreSession;
  * @author Pablo
  */
 public class Main {
-    public static void main(String args[]) {
-        Main m = new Main();
-        m.testBeginTransaction();
-        m.recoverAll();
+
+        private long prop1;
+        private int prop2;
+        private Main relatedTo;
+        @Name(order = 0)
+        private String name;
+        private String texto;
+        private List<Integer> numeros;
+
+
+        private Main(String name,String texto) {
+            prop1 = 10;
+            prop2 = 10;
+            this.name = name;
+            this.texto = texto;
+            numeros = Arrays.asList(new Integer[]{1,2,3,5,7,11});
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public long getProp1() {
+            return prop1;
+        }
+
+        public int getProp2() {
+            return prop2;
+        }
+
+        public Main getRelatedTo() {
+            return relatedTo;
+        }
+
+         public String getTexto() {
+            return texto;
+        }
+
+        public void setTexto(String texto) {
+            this.texto = texto;
+        }
+
+    public List<Integer> getNumeros() {
+        return numeros;
     }
 
-    public void testBeginTransaction() {
-        MapStoreItem item = generateMapTStoreItemExample();
-        System.out.println("beginTransaction");
+    public void setNumeros(List<Integer> numeros) {
+        this.numeros = numeros;
+    }
+
+
+
+
+    public static void main(String args[]) throws Exception {
+        //testBeginTransaction();
+        recoverAll();
+        //testSearchByName();
+
+        test();
+    }
+
+    public static void testBeginTransaction() throws UnTransformableException {
+        Main p1 = new Main("Fulano","En un lugar de la Mancha de cuyo nombre no quiero acordarme");
+        Main p2 = new Main("Mengano","En el principio creó Dios los cielos y la tierra.");
+        Main p3 = new Main("Zutano","EL espacio la última frontera");
+        p1.relatedTo = p2;
         MapStoreSession instance = MapStoreSession.getSession();
         instance.beginTransaction();
-        instance.save(item);
+        instance.save(p1);
+        instance.commit();
+
+        instance.close();
+        instance = MapStoreSession.getSession();
+        instance.beginTransaction();
+        p1.relatedTo = p3;
+        instance.update(p1);
+        instance.commit();
+        instance.close();
+        instance = MapStoreSession.getSession();
+        instance.beginTransaction();
+        MapStoreItem toDelete = instance.findByNameType(p2);
+        instance.delete(toDelete.getId());
         instance.commit();
         instance.close();
     }
 
-    private MapStoreItem generateMapTStoreItemExample() {
-        MapStoreItem item = new MapStoreItem();
-        item.setName("Prueba2");
-        item.setType("Any");
-        item.setProperty("prop1", Long.valueOf("10"));
-        item.setProperty("prop2", Integer.valueOf("10"));
-        return item;
-    }
-
-    public void recoverAll() {
+    public static void recoverAll() {
         MapStoreSession instance = MapStoreSession.getSession();
         instance.beginTransaction();
-        try {
         instance.getAll();
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            instance.close();
+        instance.close();
+    }
+
+    public static void testSearchByName() throws SQLException, CorruptIndexException, LockObtainFailedException, IOException {
+
+        MapStoreSession instance = MapStoreSession.getSession();
+        MapStoreItem i = instance.findByNameType("Mengano", Main.class.getName());
+        for (String key : i.getProperties().keySet()) {
+            Object value = i.getProperty(key);
+            System.out.println("Key: "+ key + " value: " + value.toString());
+        }
+        instance.close();
+    }
+
+    private static void test() {
+        MapStoreSession instance = MapStoreSession.getSession();
+
+        MapStoreCondition c1 = new MapStoreCondition("_ID", Arrays.asList(new Double[]{1.0,3.0}), MapStoreCondition.OP_BETWEEN);
+        MapStoreCondition c2 = new MapStoreCondition("_ID", new Double(4), MapStoreCondition.OP_BIGGEROREQUALSTHAN);
+        MapStoreCondition c3 = new MapStoreCondition("_ID", instance, MapStoreCondition.OP_BIGGERTHAN);
+        MapStoreCondition c4 = new MapStoreCondition("texto", "la", MapStoreCondition.OP_EQUALS);
+        MapStoreCondition c5 = new MapStoreCondition("_ID", instance, MapStoreCondition.OP_IN);
+        MapStoreCondition c6 = new MapStoreCondition("_ID", instance, MapStoreCondition.OP_LESSOREQUALSTHAN);
+        MapStoreCondition c7 = new MapStoreCondition("_ID", instance, MapStoreCondition.OP_LESSTHAN);
+        MapStoreCondition c8 = new MapStoreCondition("texto", "lugar", MapStoreCondition.OP_NOTEQUALS);
+        MapStoreCondition c9 = new MapStoreCondition("texto", "un lugar", MapStoreCondition.OP_PHRASE);
+        //MapStoreCondition c10 = new MapStoreCondition(null, instance, MapStoreCondition.OP_RELATED);
+        MapStoreCondition c11 = new MapStoreCondition("texto", "lugar", MapStoreCondition.OP_SIMILARITY);
+        MapStoreCondition[] conditions = new MapStoreCondition[]{c2};
+        List<MapStoreItem> items = instance.findByConditions(conditions, MapStoreSession.DISJUNCTIVE_SEARCH,null);
+        for (MapStoreItem i : items) {
+            for (String key : i.getProperties().keySet()) {
+                Object value = i.getProperty(key);
+                System.out.println("Key: "+ key + " value: " + value.toString());
+            }
+        }
+        instance.close();
+
+    }
+
+    private static void NumberToText() {
+        long l = -999999999999999L;
+        while (true) {
+            String aux = TextToNumber.toText(l);
+            System.out.println(l + " - " + aux);
+            l++;
         }
     }
+
 }

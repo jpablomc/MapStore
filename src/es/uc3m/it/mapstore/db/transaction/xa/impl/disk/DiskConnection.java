@@ -40,6 +40,7 @@ public class DiskConnection extends AbstractConnection {
     private Map<Long,Set<Long>> locked;
     private boolean autocommit;
     List<DiskOperation> operations;
+    private boolean closed;
 
     public DiskConnection(String path) {
         this.path = path;
@@ -48,6 +49,7 @@ public class DiskConnection extends AbstractConnection {
         autocommit = false;
         locked = new HashMap<Long,Set<Long>>();
         operations = new ArrayList<DiskOperation>();
+        closed = false;
     }
 
     public int prepare() throws SQLException {
@@ -104,7 +106,7 @@ public class DiskConnection extends AbstractConnection {
         if (f.exists()) throw new SQLException("Item already exist");
         MapStoreItem toRecord = eliminateNonPrimitive(i);
         serialize(f, toRecord);
-        operations.add(new DiskOperation(DiskOperation.CREATE, new Object[]{i}));
+        operations.add(new DiskOperation(DiskOperation.CREATE, new Object[]{toRecord}));
     }
 
     public void store(MapStoreItem i) throws SQLException, IOException {
@@ -113,48 +115,42 @@ public class DiskConnection extends AbstractConnection {
         acquireLock(id,version);
         String file = getPath(id) + System.getProperty("file.separator") + version;
         File f = new File(file);
-        if (!f.exists()) throw new SQLException("Item can not be updated: Item does not exist");
+        if (f.exists()) throw new SQLException("Item already exist");
         MapStoreItem toRecord = eliminateNonPrimitive(i);
         serialize(f, toRecord);
-        operations.add(new DiskOperation(DiskOperation.UPDATE, new Object[]{i}));
+        operations.add(new DiskOperation(DiskOperation.UPDATE, new Object[]{toRecord}));
     }
 
-    public void delete(long id,long version) throws SQLException {
-        /*
+    public void delete(MapStoreItem i) throws SQLException, IOException {
+        long id = i.getId();
+        long version = i.getVersion();
         acquireLock(id,version);
-        List<File> files = getAllVersions(id);
-        if (files.isEmpty()) throw new SQLException("Item can not be deleted: Item does not exist");
-        for (File aux : files) {
-            if (!aux.canWrite()) throw new SQLException("Item can not be deleted: User has no rights to delete");
-        }
-        if (getAutoCommit()) {
-            for (File aux: files) {
-                boolean result = aux.delete();
-                if (!result) throw new SQLException("Can not delete item: File can not be deleted");
-            }
-        } else {
-            dataDelete.addAll(files);
-        }
-        */
-        operations.add(new DiskOperation(DiskOperation.DELETE, new Object[]{id,version}));
+        String file = getPath(id) + System.getProperty("file.separator") + version;
+        File f = new File(file);
+        if (f.exists()) throw new SQLException("Item already exist");
+        MapStoreItem toRecord = eliminateNonPrimitive(i);
+        serialize(f, toRecord);
+        operations.add(new DiskOperation(DiskOperation.DELETE, new Object[]{toRecord}));
     }
 
-    public List<MapStoreItem> getById(List<Long> ids) throws SQLException {
+    public List<MapStoreItem> getById(Set<Integer> ids) throws SQLException {
         List<MapStoreItem> items = new ArrayList<MapStoreItem>();
-        for (Long id : ids) {
-            try {
-                File f = getLastVersion(id);
-                MapStoreItem item = deserialize(f);
-                items.add(item);
-            } catch (ClassNotFoundException ex) {
-                Logger.getLogger(DiskConnection.class.getName()).log(Level.SEVERE, null, ex);
-                throw new SQLException(ex);
-            } catch (FileNotFoundException ex) {
-                Logger.getLogger(DiskConnection.class.getName()).log(Level.SEVERE, null, ex);
-                throw new SQLException(ex);
-            } catch (IOException ex) {
-                Logger.getLogger(DiskConnection.class.getName()).log(Level.SEVERE, null, ex);
-                throw new SQLException(ex);
+        if (ids != null) {
+            for (Integer id : ids) {
+                try {
+                    File f = getLastVersion(id);
+                    MapStoreItem item = deserialize(f);
+                    items.add(item);
+                } catch (ClassNotFoundException ex) {
+                    Logger.getLogger(DiskConnection.class.getName()).log(Level.SEVERE, null, ex);
+                    throw new SQLException(ex);
+                } catch (FileNotFoundException ex) {
+                    Logger.getLogger(DiskConnection.class.getName()).log(Level.SEVERE, null, ex);
+                    throw new SQLException(ex);
+                } catch (IOException ex) {
+                    Logger.getLogger(DiskConnection.class.getName()).log(Level.SEVERE, null, ex);
+                    throw new SQLException(ex);
+                }
             }
         }
         return items;
@@ -288,4 +284,27 @@ public class DiskConnection extends AbstractConnection {
             f.mkdir();
         }
     }
+
+    MapStoreItem getByIdVersion(int id, int version) throws SQLException{
+        try {
+            String file = getPath(id) + System.getProperty("file.separator") + version;
+            return deserialize(new File(file));
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(DiskConnection.class.getName()).log(Level.SEVERE, null, ex);
+            throw new SQLException("Can not deserialize file");
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(DiskConnection.class.getName()).log(Level.SEVERE, null, ex);
+            throw new SQLException("Item does not exist");
+        } catch (IOException ex) {
+            Logger.getLogger(DiskConnection.class.getName()).log(Level.SEVERE, null, ex);
+            throw new SQLException("Can not read data");
+        }
+    }
+
+    @Override
+    public void close() throws SQLException {
+        closed = true;
+    }
+
+
 }

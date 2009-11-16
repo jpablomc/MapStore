@@ -32,6 +32,11 @@ import java.util.logging.Logger;
 import javax.transaction.xa.XAException;
 import javax.transaction.xa.XAResource;
 import javax.transaction.xa.Xid;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.store.LockObtainFailedException;
 
 /**
  *
@@ -39,6 +44,8 @@ import javax.transaction.xa.Xid;
  */
 public class LuceneXAResource extends AbstractXAResource {
     private Map<Xid,Set<LuceneConnection>> connections;
+    private IndexWriter currentWriter;
+    private Xid currentXid;
     private String path;
 
     public LuceneXAResource(String path) {
@@ -81,9 +88,10 @@ public class LuceneXAResource extends AbstractXAResource {
             boolean modifies = false;
             Set<LuceneConnection> conns = connections.get(arg0);
             if (conns != null) {
+                acquireWriter(arg0);
                 for (LuceneConnection conn : conns) {
                     try {
-                        int i = conn.prepare();
+                        int i = conn.prepare(currentWriter);
                         operations.addAll(conn.getOperations());
                         switch (i) {
                             case XAResource.XA_OK:
@@ -94,6 +102,7 @@ public class LuceneXAResource extends AbstractXAResource {
                         throw new XAException(XAException.XA_RBROLLBACK);
                     }
                 }
+                currentWriter.prepareCommit();
             }
             createXidContent(operations, xidFile);
             return (modifies) ? XAResource.XA_OK : XAResource.XA_RDONLY;
@@ -139,19 +148,27 @@ public class LuceneXAResource extends AbstractXAResource {
 
     @Override
     protected synchronized void doCommit(Xid arg0) throws XAException {
-        Set<LuceneConnection> conns = connections.get(arg0);
-        for (LuceneConnection conn :conns) {
+        try {
+            currentWriter.commit();
+            deleteXidContent(getXidFile(arg0));
+        } catch (CorruptIndexException ex) {
+            Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
+            throw new XAException(XAException.XA_RBROLLBACK);
+        } catch (IOException ex) {
+            Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
+            throw new XAException(XAException.XA_RBROLLBACK);
+        } finally {
             try {
-                conn.commit();
-            } catch (SQLException ex) {
+                currentWriter.close();
+            } catch (CorruptIndexException ex) {
                 Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
                 throw new XAException(XAException.XA_RBROLLBACK);
+            } catch (IOException ex) {
+                Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
+                throw new XAException(XAException.XA_RBROLLBACK);
+            } finally {
+                releaseWriter(arg0);
             }
-        }
-        try {
-            deleteXidContent(getXidFile(arg0));
-        } catch (IOException ex) {
-            throw new XAException(XAException.XA_RBROLLBACK);
         }
     }
 
@@ -173,13 +190,14 @@ public class LuceneXAResource extends AbstractXAResource {
 
     @Override
     protected synchronized void doRollback(Xid arg0) throws XAException {
-        Set<LuceneConnection> conns = connections.get(arg0);
-        for (LuceneConnection conn :conns) {
+        if (currentXid == arg0) {
             try {
-                conn.rollback();
-            } catch (SQLException ex) {
+                currentWriter.rollback();
+                currentWriter.close();
+                releaseWriter(arg0);
+            } catch (IOException ex) {
                 Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
-                throw new XAException(XAException.XA_RBROLLBACK);
+                throw new XAException(XAException.XAER_RMFAIL);
             }
         }
     }
@@ -240,10 +258,10 @@ public class LuceneXAResource extends AbstractXAResource {
                         Object[] params = op.getParameters();
                         switch (op.getOperation()) {
                             case LuceneOperation.CREATE:
-                                conn.indexNew((Long) params[0], (String) params[1], params[2]);
+                                conn.indexNew((Long) params[0], (Integer) params[1],(String) params[2], params[3]);
                                 break;
                             case LuceneOperation.UPDATE:
-                                conn.index((Long) params[0], (String) params[1], params[2]);
+                                conn.index((Long) params[0], (Integer) params[1],(String) params[2], params[3]);
                                 break;
                             case LuceneOperation.DELETE:
                                 conn.delete((Long) params[0]);
@@ -290,5 +308,32 @@ public class LuceneXAResource extends AbstractXAResource {
         return operations;
     }
 
+    private synchronized void acquireWriter(Xid arg0) throws XAException {
+        try {
+            while (currentWriter != null) {
+                Thread.sleep(10);
+            }
+            Analyzer analyzer = new StandardAnalyzer();
+            currentWriter = new IndexWriter(path, analyzer, IndexWriter.MaxFieldLength.UNLIMITED);
+            currentXid = arg0;
+        } catch (CorruptIndexException ex) {
+            Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
+            throw new XAException(XAException.XAER_RMERR);
+        } catch (LockObtainFailedException ex) {
+            Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
+            throw new XAException(XAException.XAER_RMERR);
+        } catch (IOException ex) {
+            Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
+            throw new XAException(XAException.XAER_RMERR);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(LuceneXAResource.class.getName()).log(Level.SEVERE, null, ex);
+            throw new XAException(XAException.XAER_RMERR);
+        }
+    }
+
+    private synchronized void releaseWriter(Xid arg0) {
+        currentWriter = null;
+        currentXid = null;
+    }
 
 }

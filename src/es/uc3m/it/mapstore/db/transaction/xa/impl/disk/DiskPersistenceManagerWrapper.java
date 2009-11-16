@@ -7,13 +7,18 @@ package es.uc3m.it.mapstore.db.transaction.xa.impl.disk;
 
 import es.uc3m.it.mapstore.bean.MapStoreCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
+import es.uc3m.it.mapstore.bean.MapStoreResult;
 import es.uc3m.it.mapstore.db.transaction.xa.PersistenceManagerWrapper;
 import es.uc3m.it.mapstore.exception.MapStoreRunTimeException;
 import java.io.File;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.sql.XAConnection;
@@ -73,17 +78,54 @@ public class DiskPersistenceManagerWrapper implements PersistenceManagerWrapper{
     }
 
     @Override
-    public void update(MapStoreItem item,Transaction t) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public void update(MapStoreItem item,MapStoreItem old,Transaction t) {
+        DiskXAResource res=null;
+        Exception e = null;
+        boolean enlisted = false;
+        try {
+            DiskXAConnection xaconn = ds.getXAConnection();
+            res = xaconn.getXAResource();
+            t.enlistResource(res);
+            enlisted = true;
+            DiskConnection conn = xaconn.getConnection();
+            conn.store(item);
+            t.delistResource(res, XAResource.TMSUCCESS);
+            enlisted = false;
+        } catch (IOException ex) {
+            e= ex;
+            Logger.getLogger(DiskPersistenceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (RollbackException ex) {
+            e= ex;
+            Logger.getLogger(DiskPersistenceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IllegalStateException ex) {
+            e= ex;
+            Logger.getLogger(DiskPersistenceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SystemException ex) {
+            e= ex;
+            Logger.getLogger(DiskPersistenceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SQLException ex) {
+            e= ex;
+            Logger.getLogger(DiskPersistenceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        if (e != null) {
+            if (enlisted) try {
+                t.delistResource(res, XAResource.TMFAIL);
+            } catch (IllegalStateException ex) {
+                Logger.getLogger(DiskPersistenceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            } catch (SystemException ex) {
+                Logger.getLogger(DiskPersistenceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            throw new MapStoreRunTimeException(e);
+        }
     }
 
     @Override
-    public void delete(long id,Transaction t) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public void delete(MapStoreItem item,MapStoreItem old,Transaction t) {
+        update(item, old, t);
     }
 
     @Override
-    public List<MapStoreItem> recoverById(List<Long> ids) {
+    public List<MapStoreItem> recoverById(Set<Integer> ids) {
         try {
             DiskConnection conn = ds.getXAConnection().getConnection();
             return conn.getById(ids);
@@ -104,12 +146,12 @@ public class DiskPersistenceManagerWrapper implements PersistenceManagerWrapper{
     }
 
     @Override
-    public long getNewId() {
+    public int getNewId() {
         return idgen.getNewId();
     }
 
     @Override
-    public long getNewVersion(long id) {
+    public int getNewVersion(int id) {
         return idgen.getNewVersion(id);
     }
 
@@ -129,13 +171,55 @@ public class DiskPersistenceManagerWrapper implements PersistenceManagerWrapper{
     }
 
     @Override
-    public List<Long> findByConditions(List<MapStoreCondition> cond) {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public Map<Integer,MapStoreResult> findByConditions(List<MapStoreCondition> cond, int flag, Date fecha) {
+        throw new UnsupportedOperationException("This resource can not permorm searches");
+    }
+
+    @Override
+    public boolean canFindByNameType() {
+        return false;
+    }
+
+    @Override
+    public Integer findByNameType(String name, String type) {
+        throw new UnsupportedOperationException("This resource can not permorm searches");
     }
 
     @Override
     public void getAll() {
         throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public Map<Integer, Map<Integer, MapStoreItem>> recoverByIdVersion(Map<Integer, Set<Integer>> request) {
+        DiskConnection conn = null;
+        try {
+            conn = ds.getXAConnection().getConnection();
+            Map<Integer, Map<Integer, MapStoreItem>> results = new HashMap<Integer, Map<Integer, MapStoreItem>>();
+            for (int id : request.keySet()) {
+                Set<Integer> versiones = request.get(id);
+                Map<Integer, MapStoreItem> items = new HashMap<Integer, MapStoreItem>();
+                for (int version : versiones) {
+                    MapStoreItem item = conn.getByIdVersion(id, version);
+                    items.put(version, item);
+                }
+                results.put(id, items);
+            }
+            conn.close();
+            return results;
+        } catch (SQLException ex) {
+            Logger.getLogger(DiskPersistenceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
+        } finally {
+            try {
+                if (conn != null && !conn.isClosed()) {
+                    conn.close();
+                }
+            } catch (SQLException ex) {
+                Logger.getLogger(DiskPersistenceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+                throw new MapStoreRunTimeException(ex);
+            }
+        }
     }
 
 

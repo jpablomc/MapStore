@@ -37,7 +37,6 @@ public class DefaultTransformer implements MapStoreTransformer<Object>{
             try {
                 //Primero intentamos la recuperación por el getter
                 value = recoverPropertyByMethod(object, key);
-                errorOnRecovery = true;
             } catch (Exception ex) {
                 errorRecoveringPropertyByMethod(ex,key);
                 errorOnRecovery = true;
@@ -85,7 +84,7 @@ public class DefaultTransformer implements MapStoreTransformer<Object>{
     }
 
     private Object recoverPropertyByMethod(Object object, String  key) throws SecurityException, NoSuchMethodException, InvocationTargetException, IllegalArgumentException, IllegalAccessException  {
-        String aux = String.valueOf(key.charAt(0)).toUpperCase()+key.substring(1);           
+        String aux = "get" + String.valueOf(key.charAt(0)).toUpperCase()+key.substring(1);
         Method m = object.getClass().getMethod(aux);
         return m.invoke(object, new Object[0]);
     }

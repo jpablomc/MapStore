@@ -225,7 +225,7 @@ public class DiskXAResource extends AbstractXAResource {
                                 conn.store((MapStoreItem) params[0]);
                                 break;
                             case DiskOperation.DELETE:
-                                conn.delete((Long) params[0], (Long) params[1]);
+                                conn.delete((MapStoreItem) params[0]);
                                 break;
                         }
                     }
