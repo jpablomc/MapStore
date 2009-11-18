@@ -34,6 +34,7 @@ public class MapTransformer implements MapStoreTransformer<Map> {
             index++;        
         }
         item.setType(object.getClass().getName());
+        item.setExtra(MapStoreItem.ISMAP);
         return item;
     }
 

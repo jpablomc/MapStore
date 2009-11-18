@@ -91,6 +91,55 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
         initDatabase();
     }
 
+    private void createObject(MapStoreItem item, Transaction t) throws MapStoreRunTimeException {
+        Exception e = null;
+        try {
+            boolean result;
+            long id = item.getId();
+            long version = item.getVersion();
+            List<String> props = getPropertiesToProcess(item);
+            XAConnection connXA = ds.getXAConnection();
+            XAResource r = connXA.getXAResource();
+            Connection conn = connXA.getConnection();
+            result = t.enlistResource(r);
+            if (!result) {
+                throw new MapStoreRunTimeException("Can not enlist resource in transaction");
+            }
+            for (String property : props) {
+                Object value = item.getProperty(property);
+                String sql = dialect.create(id, version, property, value);
+                PreparedStatement ps;
+                ps = conn.prepareStatement(sql);
+                ps.executeUpdate();
+            }
+            if (item.getName() != null) {
+                String sql = dialect.insertTypeName(id, item.getType(), item.getName());
+                PreparedStatement ps;
+                ps = conn.prepareStatement(sql);
+                ps.executeUpdate();
+            }
+            result = t.delistResource(r, XAResource.TMSUCCESS);
+            if (!result) {
+                throw new MapStoreRunTimeException("Can not delist resource in transaction");
+            }
+        } catch (RollbackException ex) {
+            e = ex;
+            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IllegalStateException ex) {
+            e = ex;
+            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SystemException ex) {
+            e = ex;
+            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SQLException ex) {
+            e = ex;
+            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        if (e != null) {
+            throw new MapStoreRunTimeException(e);
+        }
+    }
+
     private void initDatabase() {
         try {
             //Se hace fuera de la transacion XA... LA MANIPULACION DE TABLAS NO ES TRANSACCIONAL            
@@ -125,46 +174,8 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
 
     @Override
     public void create(MapStoreItem item, Transaction t) {
-        Exception e=null;
-        try {
-            boolean result;
-            long id = item.getId();
-            long version = item.getVersion();
-            List<String> props = getPropertiesToProcess(item);
-            XAConnection connXA = ds.getXAConnection();
-            XAResource r = connXA.getXAResource();
-            Connection conn =  connXA.getConnection();
-            result = t.enlistResource(r);
-            if (!result) throw new MapStoreRunTimeException("Can not enlist resource in transaction");
-            for (String property : props) {
-                Object value = item.getProperty(property);
-                String sql = dialect.create(id, version, property, value);
-                PreparedStatement ps;
-                ps = conn.prepareStatement(sql);
-                ps.executeUpdate();
-            }
-            if (item.getName() != null) {
-                String sql = dialect.insertTypeName(id, item.getType(), item.getName());
-                PreparedStatement ps;
-                ps = conn.prepareStatement(sql);
-                ps.executeUpdate();
-            }
-            result = t.delistResource(r, XAResource.TMSUCCESS);
-            if (!result) throw new MapStoreRunTimeException("Can not delist resource in transaction");
-        } catch (RollbackException ex) {
-            e=ex;
-            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IllegalStateException ex) {
-            e=ex;
-            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (SystemException ex) {
-            e=ex;
-            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (SQLException ex) {
-            e=ex;
-            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        if (e != null) throw new MapStoreRunTimeException(e);
+        if (item.isCollection()) createCollection(item, t);
+        else createObject(item, t);
     }
 
     @Override
@@ -333,6 +344,84 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
         } catch (SQLException ex) {
             Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
             throw new MapStoreRunTimeException(ex);
+        }
+    }
+
+    private void createCollection(MapStoreItem item, Transaction t) {
+        //El objeto tendra en name el nombre de la propiedad
+        List<String> props = getPropertiesToProcess(item);
+        String prefix = item.getPrefix();
+        Map<Integer,Object> map = new HashMap<Integer, Object>();
+        for (String property: item.getProperties().keySet()) {
+            //Si es procesable y es de la lista
+            if (property.startsWith(prefix) && props.contains(property)) {
+                String order = property.substring(prefix.length());
+                int index = Integer.valueOf(order);
+                map.put(index, item.getProperty(property));
+                props.remove(property);
+            }
+        }
+        //Aqui tendremos dos listas. El objeto map que contiene la lista y  props que contiene el resto de datos a agregar al documento
+
+        Exception e = null;
+        try {
+            boolean result;
+            long id = item.getId();
+            long version = item.getVersion();
+            XAConnection connXA = ds.getXAConnection();
+            XAResource r = connXA.getXAResource();
+            Connection conn = connXA.getConnection();
+            result = t.enlistResource(r);
+            if (!result) {
+                throw new MapStoreRunTimeException("Can not enlist resource in transaction");
+            }
+            for (String property : props) {
+                Object value = item.getProperty(property);
+                String sql = dialect.create(id, version, property, value);
+                PreparedStatement ps;
+                ps = conn.prepareStatement(sql);
+                ps.executeUpdate();
+            }
+
+            //Procesamos la lista
+            if (!map.isEmpty()) {
+                //El nombre del campo esta en la propiedad name del MapStoreItem en formato "id|propiedad"
+                String[] nombre = item.getName().split("\\|");
+                //Se crea un wrapper para la colección ya que por defecto el objeto devuelto puede no ser serializable (de hecho no lo es)
+                for (Integer i: map.keySet()) {
+                    String sql = dialect.createList(id, version, i.longValue(),nombre[1], map.get(i));
+                    PreparedStatement ps;
+                    ps = conn.prepareStatement(sql);
+                    ps.executeUpdate();
+                }
+            }
+
+            //Procesamos el nombre
+            if (item.getName() != null) {
+                String sql = dialect.insertTypeName(id, item.getType(), item.getName());
+                PreparedStatement ps;
+                ps = conn.prepareStatement(sql);
+                ps.executeUpdate();
+            }
+            result = t.delistResource(r, XAResource.TMSUCCESS);
+            if (!result) {
+                throw new MapStoreRunTimeException("Can not delist resource in transaction");
+            }
+        } catch (RollbackException ex) {
+            e = ex;
+            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IllegalStateException ex) {
+            e = ex;
+            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SystemException ex) {
+            e = ex;
+            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (SQLException ex) {
+            e = ex;
+            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        if (e != null) {
+            throw new MapStoreRunTimeException(e);
         }
     }
    

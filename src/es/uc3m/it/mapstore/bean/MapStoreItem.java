@@ -24,6 +24,7 @@ public class MapStoreItem implements Serializable{
     public final static String RECORDDATE = "_RECORDDATE";
     public final static String DELETED = "_DELETED";
     public final static String EXTRA = "_EXTRA";
+    public final static String MAPCOLLECTIONARRAYPREFIX = "_PREFIX";
 
     public final static int ISCOLLECTION = 0x01;
     public final static int ISMAP = 0x02;
@@ -157,6 +158,43 @@ public class MapStoreItem implements Serializable{
      */
     public void setDeleted(boolean value) {
         properties.put(DELETED, value);
+    }
+
+    /**
+     * Devuelve los datos adicionales del objeto
+     *
+     * @return
+     */
+    public int getExtra() {
+        Integer extra = (Integer)properties.get(EXTRA);
+        return (extra == null)?0:extra;
+    }
+    /**
+     * Establece los datos adicionales del objeto
+     *
+     * @param value Nuevo valor del tipo de objeto
+     */
+    public void setExtra(int extra) {
+        properties.put(EXTRA, extra);
+    }
+
+    /**
+     * Devuelve el prefijo usado para las propiedades de una lista o array
+     *
+     * @return
+     */
+    public String getPrefix() {
+        String prefix = null;
+        if (isArray() || isCollection() || isMap()) prefix = (String)properties.get(MAPCOLLECTIONARRAYPREFIX);
+        return prefix;
+    }
+    /**
+     * Establece el prefijo utilizado en una lista o array
+     *
+     * @param value Nuevo valor del tipo de objeto
+     */
+    public void setPrefix(String prefix) {
+        properties.put(MAPCOLLECTIONARRAYPREFIX, prefix);
     }
 
 

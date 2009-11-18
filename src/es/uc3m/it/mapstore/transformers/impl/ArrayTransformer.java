@@ -37,6 +37,8 @@ public class ArrayTransformer implements MapStoreTransformer<Object[]>{
         }
         item.setType(collection.getClass().getComponentType().getName());
         item.setProperty(GENERIC_STRING, ReflectionUtils.determineGenericType(Arrays.asList(collection)).getName());
+        item.setExtra(MapStoreItem.ISARRAY);
+        item.setPrefix(PROP_STRING);
         return item;
     }
 

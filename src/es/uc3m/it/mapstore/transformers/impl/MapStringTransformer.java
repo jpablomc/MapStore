@@ -29,6 +29,7 @@ public class MapStringTransformer implements MapStoreTransformer<Map<String,? ex
             item.setProperty(key, object.get(key));
         }
         item.setType(object.getClass().getName());
+        item.setExtra(MapStoreItem.ISMAP);
         return item;
 
     }

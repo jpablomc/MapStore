@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -182,8 +183,16 @@ public class LuceneConnection extends AbstractConnection {
         }
         //Comprobar que no sea el id...
         if (!MapStoreItem.ID.equals(property)) {
-            Field f = new Field(property, value.toString(), Field.Store.NO, Field.Index.ANALYZED);
-            d.add(f);
+            if (value instanceof Collection) {
+                Collection col = (Collection) value;
+                for (Object obj : col) {
+                    Field f = new Field(property, value.toString(), Field.Store.NO, Field.Index.ANALYZED);
+                    d.add(f);
+                }
+            }else {
+                Field f = new Field(property, value.toString(), Field.Store.NO, Field.Index.ANALYZED);
+                d.add(f);
+            }            
         }
     }
 

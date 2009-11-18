@@ -30,6 +30,7 @@ public class Main {
         private String name;
         private String texto;
         private List<Integer> numeros;
+        private List<String> caracteres;
 
 
         private Main(String name,String texto) {
@@ -38,6 +39,7 @@ public class Main {
             this.name = name;
             this.texto = texto;
             numeros = Arrays.asList(new Integer[]{1,2,3,5,7,11});
+            caracteres = Arrays.asList(new String[]{"1","2a","a3","b",""});
         }
 
         public String getName() {
@@ -72,11 +74,16 @@ public class Main {
         this.numeros = numeros;
     }
 
+    public List<String> getCaracteres() {
+        return caracteres;
+    }
 
-
+    public void setCaracteres(List<String> caracteres) {
+        this.caracteres = caracteres;
+    }
 
     public static void main(String args[]) throws Exception {
-        //testBeginTransaction();
+        testBeginTransaction();
         recoverAll();
         //testSearchByName();
 
@@ -84,11 +91,12 @@ public class Main {
     }
 
     public static void testBeginTransaction() throws UnTransformableException {
+        MapStoreSession instance = MapStoreSession.getSession();
+        if (instance.findByNameType("Fulano", Main.class.getName()) != null) return;
         Main p1 = new Main("Fulano","En un lugar de la Mancha de cuyo nombre no quiero acordarme");
         Main p2 = new Main("Mengano","En el principio creó Dios los cielos y la tierra.");
         Main p3 = new Main("Zutano","EL espacio la última frontera");
         p1.relatedTo = p2;
-        MapStoreSession instance = MapStoreSession.getSession();
         instance.beginTransaction();
         instance.save(p1);
         instance.commit();

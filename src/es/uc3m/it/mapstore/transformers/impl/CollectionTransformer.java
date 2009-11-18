@@ -36,6 +36,8 @@ public class CollectionTransformer implements MapStoreTransformer<Collection<? e
         }
         item.setType(collection.getClass().getName());
         item.setProperty(GENERIC_STRING, ReflectionUtils.determineGenericType(collection).getName());
+        item.setExtra(MapStoreItem.ISCOLLECTION);
+        item.setPrefix(PROP_STRING);
         return item;
     }
 

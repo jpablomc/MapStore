@@ -12,7 +12,9 @@ import es.uc3m.it.mapstore.db.transaction.xa.impl.ResourceManagerlImpl;
 import es.uc3m.it.mapstore.exception.MapStoreRunTimeException;
 import java.io.File;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -31,6 +33,7 @@ import org.apache.lucene.document.Fieldable;
  * @author Pablo
  */
 public class LuceneResourceManagerWrapper extends ResourceManagerlImpl {
+
     private String type;
     private String name;
     private LuceneXADataSource ds;
@@ -59,53 +62,18 @@ public class LuceneResourceManagerWrapper extends ResourceManagerlImpl {
         name = prop.getProperty("name");
         type = prop.getProperty("type");
         String directory = prop.getProperty("directory");
-        if (directory == null) directory = (new File("")).getAbsolutePath() +
-                System.getProperty("file.separator") + "db" +
-                System.getProperty("file.separator") + "lucene";
+        if (directory == null) {
+            directory = (new File("")).getAbsolutePath() +
+                    System.getProperty("file.separator") + "db" +
+                    System.getProperty("file.separator") + "lucene";
+        }
         ds = new LuceneXADataSource(directory);
     }
 
     @Override
     public void create(MapStoreItem item, Transaction t) {
-        LuceneXAResource res=null;
-        boolean enlisted = false;
-        List<String> props = getPropertiesToProcess(item);
-        long id = item.getId();
-        try {
-            LuceneXAConnection xaconn = ds.getXAConnection();
-            res = xaconn.getXAResource();
-            enlisted = t.enlistResource(res);
-            LuceneConnection conn = xaconn.getConnection();
-            for (String property : props) {
-                Object o = item.getProperty(property);
-                conn.indexNew(id, item.getVersion(), property, o);
-            }
-            enlisted = !(t.delistResource(res, XAResource.TMSUCCESS));          
-        } catch (RollbackException ex) {
-            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
-            throw new MapStoreRunTimeException(ex);
-        } catch (IllegalStateException ex) {
-            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
-            throw new MapStoreRunTimeException(ex);
-        } catch (SystemException ex) {
-            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
-            throw new MapStoreRunTimeException(ex);
-        } catch (SQLException ex) {
-            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
-            throw new MapStoreRunTimeException(ex);
-        } finally {
-            if(enlisted) {
-                try {
-                    t.delistResource(res, XAResource.TMFAIL);
-                } catch (IllegalStateException ex) {
-                    Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
-                    throw new MapStoreRunTimeException(ex);
-                } catch (SystemException ex) {
-                    Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
-                    throw new MapStoreRunTimeException(ex);
-                }
-            }
-        }
+        if (item.isCollection() ||item.isArray()) createCollection(item, t);
+        else createObject(item, t);
     }
 
     @Override
@@ -114,7 +82,7 @@ public class LuceneResourceManagerWrapper extends ResourceManagerlImpl {
     }
 
     @Override
-    public Map<Integer,MapStoreResult> findByConditions(List<MapStoreCondition> cond, int flag, Date fecha) {
+    public Map<Integer, MapStoreResult> findByConditions(List<MapStoreCondition> cond, int flag, Date fecha) {
         LuceneConnection conn;
         try {
             conn = ds.getXAConnection().getConnection();
@@ -158,4 +126,110 @@ public class LuceneResourceManagerWrapper extends ResourceManagerlImpl {
         throw new UnsupportedOperationException("Resource does not support search by name/type");
     }
 
+    private void createCollection(MapStoreItem item, Transaction t) {
+        //El objeto tendra en name el nombre de la propiedad
+        List<String> props = getPropertiesToProcess(item);
+        String prefix = item.getPrefix();
+        Map<Integer,Object> map = new HashMap<Integer, Object>();
+        for (String property: item.getProperties().keySet()) {
+            //Si es procesable y es de la lista
+            if (property.startsWith(prefix) && props.contains(property)) {
+                String order = property.substring(prefix.length());
+                int index = Integer.valueOf(order);
+                map.put(index, item.getProperty(property));
+                props.remove(property);
+            }
+        }
+        //Aqui tendremos dos listas. El objeto map que contiene la lista y  props que contiene el resto de datos a agregar al documento
+
+        LuceneXAResource res = null;
+        boolean enlisted = false;
+        long id = item.getId();
+        try {
+            LuceneXAConnection xaconn = ds.getXAConnection();
+            res = xaconn.getXAResource();
+            enlisted = t.enlistResource(res);
+            LuceneConnection conn = xaconn.getConnection();
+            //Procesamos los datos que no son de lista
+            for (String property : props) {
+                Object o = item.getProperty(property);
+                conn.indexNew(id, item.getVersion(), property, o);
+            }
+            //Procesamos la lista
+            if (!map.isEmpty()) {
+                //El nombre del campo esta en la propiedad name del MapStoreItem en formato "id|propiedad"
+                String[] nombre = item.getName().split("\\|");
+                //Se crea un wrapper para la colección ya que por defecto el objeto devuelto puede no ser serializable (de hecho no lo es)
+                ArrayList aux = new ArrayList(map.values());
+                conn.indexNew(id, item.getVersion(), nombre[1], aux);
+            }
+            enlisted = !(t.delistResource(res, XAResource.TMSUCCESS));
+        } catch (RollbackException ex) {
+            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
+        } catch (IllegalStateException ex) {
+            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
+        } catch (SystemException ex) {
+            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
+        } catch (SQLException ex) {
+            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
+        } finally {
+            if (enlisted) {
+                try {
+                    t.delistResource(res, XAResource.TMFAIL);
+                } catch (IllegalStateException ex) {
+                    Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+                    throw new MapStoreRunTimeException(ex);
+                } catch (SystemException ex) {
+                    Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+                    throw new MapStoreRunTimeException(ex);
+                }
+            }
+        }
+    }
+
+    private void createObject(MapStoreItem item, Transaction t) throws MapStoreRunTimeException {
+        LuceneXAResource res = null;
+        boolean enlisted = false;
+        List<String> props = getPropertiesToProcess(item);
+        long id = item.getId();
+        try {
+            LuceneXAConnection xaconn = ds.getXAConnection();
+            res = xaconn.getXAResource();
+            enlisted = t.enlistResource(res);
+            LuceneConnection conn = xaconn.getConnection();
+            for (String property : props) {
+                Object o = item.getProperty(property);
+                conn.indexNew(id, item.getVersion(), property, o);
+            }
+            enlisted = !(t.delistResource(res, XAResource.TMSUCCESS));
+        } catch (RollbackException ex) {
+            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
+        } catch (IllegalStateException ex) {
+            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
+        } catch (SystemException ex) {
+            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
+        } catch (SQLException ex) {
+            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
+        } finally {
+            if (enlisted) {
+                try {
+                    t.delistResource(res, XAResource.TMFAIL);
+                } catch (IllegalStateException ex) {
+                    Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+                    throw new MapStoreRunTimeException(ex);
+                } catch (SystemException ex) {
+                    Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+                    throw new MapStoreRunTimeException(ex);
+                }
+            }
+        }
+    }
 }
