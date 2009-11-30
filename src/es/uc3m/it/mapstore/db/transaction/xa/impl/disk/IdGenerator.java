@@ -60,7 +60,7 @@ public class IdGenerator {
 
 
     private int initLastId(String path) {
-        int depth = 4;
+        int depth = 8;
         String aux = path;
         int[] id = new int[depth];
         while (depth > 0) {            
@@ -84,7 +84,7 @@ public class IdGenerator {
     private int initLastId(String path, int first, int last) {
         String sep = System.getProperty("file.separator");
         int mean = (first + last)/2;
-        String hex = Integer.toString(mean);
+        String hex = Integer.toHexString(mean);
         while (hex.length()<2) hex = "0" + hex;
         File f = new File(path + sep + hex);
         if (f.exists()) {

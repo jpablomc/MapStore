@@ -13,6 +13,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import javax.sql.XAConnection;
 import javax.transaction.Transaction;
 
@@ -32,4 +33,6 @@ public Map<Integer,MapStoreResult> findByConditions(List<MapStoreCondition> cond
 public void getAll();
 public boolean canFindByNameType();
 public Integer findByNameType(String name, String type);
+public Set<Integer> findByType(String type);
+public void shutdown();
 }

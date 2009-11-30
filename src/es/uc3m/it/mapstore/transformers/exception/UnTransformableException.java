@@ -16,4 +16,12 @@ public class UnTransformableException extends MapStoreException{
     public UnTransformableException(String string) {
         super(string);
     }
+
+    public UnTransformableException(Throwable cause) {
+        super(cause);
+    }
+
+    public UnTransformableException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

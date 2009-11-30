@@ -2,7 +2,6 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package es.uc3m.it.mapstore.db.transaction.xa.impl.lucene;
 
 import es.uc3m.it.mapstore.bean.MapStoreCondition;
@@ -49,27 +48,30 @@ import org.apache.lucene.store.LockObtainFailedException;
  * @author Pablo
  */
 public class LuceneConnection extends AbstractConnection {
+
     private IndexWriter w;
-    private Map<Long,Document> data;
+    private Map<Long, Document> data;
     private Set<Long> dataDelete;
     private boolean prepared;
     private String path;
     private Analyzer analyzer;
     private List<LuceneOperation> operations;
     private SimpleDateFormat df;
-      
+
     public LuceneConnection(String path) throws CorruptIndexException, LockObtainFailedException, IOException {
         analyzer = new StandardAnalyzer();
-        data = new HashMap<Long,Document>();
+        data = new HashMap<Long, Document>();
         dataDelete = new HashSet<Long>();
         this.path = path;
         operations = new ArrayList<LuceneOperation>();
         df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     }
-    
+
     @Override
     public void commit() throws SQLException {
-        if (!prepared) prepare();
+        if (!prepared) {
+            prepare();
+        }
         try {
             w.commit();
             w.close();
@@ -84,13 +86,13 @@ public class LuceneConnection extends AbstractConnection {
 
     public void indexNew(long id, long version, String property, Object value) throws SQLException {
         doNew(id, version, property, value);
-        LuceneOperation op = new LuceneOperation(LuceneOperation.CREATE, new Object[]{id,version,property,value});
+        LuceneOperation op = new LuceneOperation(LuceneOperation.CREATE, new Object[]{id, version, property, value});
         operations.add(op);
     }
 
     public void index(long id, long version, String property, Object value) throws SQLException {
         doUpdate(id, version, property, value);
-        LuceneOperation op = new LuceneOperation(LuceneOperation.UPDATE, new Object[]{id,version,property,value});
+        LuceneOperation op = new LuceneOperation(LuceneOperation.UPDATE, new Object[]{id, version, property, value});
         operations.add(op);
     }
 
@@ -100,14 +102,14 @@ public class LuceneConnection extends AbstractConnection {
         operations.add(op);
     }
 
-    public int prepare() throws SQLException {        
+    public int prepare() throws SQLException {
         try {
-            w = new IndexWriter(path,analyzer, IndexWriter.MaxFieldLength.UNLIMITED);
-            for (Long id: dataDelete) {
+            w = new IndexWriter(path, analyzer, IndexWriter.MaxFieldLength.UNLIMITED);
+            for (Long id : dataDelete) {
                 Term t = new Term(MapStoreItem.ID, id.toString());
                 w.deleteDocuments(t);
             }
-            for (Document d: data.values()) {
+            for (Document d : data.values()) {
                 w.addDocument(d);
             }
         } catch (CorruptIndexException ex) {
@@ -127,16 +129,16 @@ public class LuceneConnection extends AbstractConnection {
             throw new SQLException(ex);
         }
         prepared = true;
-        return (dataDelete.size() + data.size()>0)?XAResource.XA_OK:XAResource.XA_RDONLY;
+        return (dataDelete.size() + data.size() > 0) ? XAResource.XA_OK : XAResource.XA_RDONLY;
     }
 
     public int prepare(IndexWriter w) throws SQLException {
         try {
-            for (Long id: dataDelete) {
+            for (Long id : dataDelete) {
                 Term t = new Term(MapStoreItem.ID, id.toString());
                 w.deleteDocuments(t);
             }
-            for (Document d: data.values()) {
+            for (Document d : data.values()) {
                 w.addDocument(d);
             }
         } catch (CorruptIndexException ex) {
@@ -147,12 +149,12 @@ public class LuceneConnection extends AbstractConnection {
             throw new SQLException(ex);
         }
         prepared = true;
-        return (dataDelete.size() + data.size()>0)?XAResource.XA_OK:XAResource.XA_RDONLY;
+        return (dataDelete.size() + data.size() > 0) ? XAResource.XA_OK : XAResource.XA_RDONLY;
     }
 
     public List<Document> getAll() {
         List<Document> docs = new ArrayList<Document>();
-        try {            
+        try {
             IndexReader r = IndexReader.open(path);
             int max = r.maxDoc();
             for (int i = 0; i < max; i++) {
@@ -189,10 +191,10 @@ public class LuceneConnection extends AbstractConnection {
                     Field f = new Field(property, value.toString(), Field.Store.NO, Field.Index.ANALYZED);
                     d.add(f);
                 }
-            }else {
+            } else {
                 Field f = new Field(property, value.toString(), Field.Store.NO, Field.Index.ANALYZED);
                 d.add(f);
-            }            
+            }
         }
     }
 
@@ -204,13 +206,10 @@ public class LuceneConnection extends AbstractConnection {
     public List<LuceneOperation> getOperations() {
         return operations;
     }
-
-
     public final static int CONJUNCTIVE_SEARCH = 0;
     public final static int DISJUNCTIVE_SEARCH = 1;
 
-
-    public Map<Integer,MapStoreResult> findByConditions(List<MapStoreCondition> cond, int flag, Date fecha) throws SQLException {
+    public Map<Integer, MapStoreResult> findByConditions(List<MapStoreCondition> cond, int flag, Date fecha) throws SQLException {
         BooleanQuery q = new BooleanQuery();
         BooleanClause.Occur bc = null;
         switch (flag) {
@@ -221,7 +220,7 @@ public class LuceneConnection extends AbstractConnection {
                 bc = BooleanClause.Occur.SHOULD;
                 break;
         }
-        for (MapStoreCondition c: cond) {
+        for (MapStoreCondition c : cond) {
             Query qAux = null;
             switch (c.getOperator()) {
                 case MapStoreCondition.OP_EQUALS:
@@ -232,7 +231,7 @@ public class LuceneConnection extends AbstractConnection {
                     t = new Term(c.getProperty(), c.getValue().toString());
                     qAux = new TermQuery(t);
                     BooleanQuery baux = new BooleanQuery();
-                    baux.add(qAux,BooleanClause.Occur.MUST_NOT);
+                    baux.add(qAux, BooleanClause.Occur.MUST_NOT);
                     qAux = baux;
                     break;
                 case MapStoreCondition.OP_PHRASE:
@@ -250,32 +249,36 @@ public class LuceneConnection extends AbstractConnection {
                     qAux = new FuzzyQuery(t);
                     break;
             }
-            if (qAux != null) q.add(qAux, bc);
+            if (qAux != null) {
+                q.add(qAux, bc);
+            }
         }
         if (fecha != null) {
-            Term lowerTerm = new Term(MapStoreItem.RECORDDATE,"1900-01-01 00:00:00");
-            Term upperTerm = new Term(MapStoreItem.RECORDDATE,df.format(fecha));
+            Term lowerTerm = new Term(MapStoreItem.RECORDDATE, "1900-01-01 00:00:00");
+            Term upperTerm = new Term(MapStoreItem.RECORDDATE, df.format(fecha));
             RangeQuery rq = new RangeQuery(lowerTerm, upperTerm, true);
-            q.add(rq,BooleanClause.Occur.MUST);
+            q.add(rq, BooleanClause.Occur.MUST);
         }
         IndexSearcher is = null;
         try {
             is = new IndexSearcher(path);
             int maxDocs = is.maxDoc();
-            TopDocs td = is.search(q, maxDocs);
-            ScoreDoc[] sd = td.scoreDocs;
-            IndexReader r = is.getIndexReader();
-            Map<Integer,MapStoreResult> results = new HashMap<Integer, MapStoreResult>();
-            for (int i= 0;i<sd.length;i++) {
-                Document d = r.document(sd[0].doc);
-                Integer id = new Integer(d.getFieldable(MapStoreItem.ID).stringValue());
-                Integer ver = new Integer(d.getFieldable(MapStoreItem.VERSION).stringValue());
-                MapStoreResult res = results.get(id);
-                if (res == null) {
-                    res = new MapStoreResult(id);
-                    results.put(id, res);
+            Map<Integer, MapStoreResult> results = new HashMap<Integer, MapStoreResult>();
+            if (maxDocs > 0) {
+                TopDocs td = is.search(q, maxDocs);
+                ScoreDoc[] sd = td.scoreDocs;
+                IndexReader r = is.getIndexReader();
+                for (int i = 0; i < sd.length; i++) {
+                    Document d = r.document(sd[0].doc);
+                    Integer id = new Integer(d.getFieldable(MapStoreItem.ID).stringValue());
+                    Integer ver = new Integer(d.getFieldable(MapStoreItem.VERSION).stringValue());
+                    MapStoreResult res = results.get(id);
+                    if (res == null) {
+                        res = new MapStoreResult(id);
+                        results.put(id, res);
+                    }
+                    res.addVersion(ver);
                 }
-                res.addVersion(ver);
             }
             return results;
         } catch (FileNotFoundException ex) {
@@ -288,12 +291,12 @@ public class LuceneConnection extends AbstractConnection {
             throw new SQLException(ex);
         } finally {
             if (is != null) try {
-                is.close();
-            } catch (IOException ex) {
-                Logger.getLogger(LuceneConnection.class.getName()).log(Level.SEVERE, null, ex);
-                throw new SQLException(ex);
+                    is.close();
+                } catch (IOException ex) {
+                    Logger.getLogger(LuceneConnection.class.getName()).log(Level.SEVERE, null, ex);
+                    throw new SQLException(ex);
+                }
             }
-        }
-        
+
     }
 }

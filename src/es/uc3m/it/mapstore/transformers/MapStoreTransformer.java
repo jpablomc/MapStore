@@ -14,5 +14,5 @@ import es.uc3m.it.mapstore.bean.MapStoreItem;
  */
 public interface MapStoreTransformer<T> {
     public MapStoreItem toStore(T object) throws UnTransformableException;
-    public T toObject(MapStoreItem item);
+    public T toObject(MapStoreItem item) throws UnTransformableException;
 }

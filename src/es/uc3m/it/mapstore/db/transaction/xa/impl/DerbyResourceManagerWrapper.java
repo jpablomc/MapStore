@@ -18,6 +18,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -66,9 +67,11 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
     @Override
     public void start(Properties prop) throws MapStoreRunTimeException {
         Exception e= null;
-        ds = new EmbeddedXADataSource40();
-        ds.setDatabaseName("db/derby");
-        ds.setCreateDatabase("create");
+        if (ds == null) {
+            ds = new EmbeddedXADataSource40();
+            ds.setDatabaseName("db/derby");
+            ds.setCreateDatabase("create");
+        }
         name = prop.getProperty("name");
         type = prop.getProperty("type");
         Class<SQLDialect> clazz;
@@ -110,10 +113,12 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
                 String sql = dialect.create(id, version, property, value);
                 PreparedStatement ps;
                 ps = conn.prepareStatement(sql);
+                System.out.println(sql);
                 ps.executeUpdate();
             }
             if (item.getName() != null) {
                 String sql = dialect.insertTypeName(id, item.getType(), item.getName());
+                System.out.println(sql);
                 PreparedStatement ps;
                 ps = conn.prepareStatement(sql);
                 ps.executeUpdate();
@@ -152,9 +157,9 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
                     ps.execute();
                 }
             }
+            c.close();
         } catch (SQLException ex) {
-            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
-            throw new MapStoreRunTimeException("Can not initialize database");
+            throw new MapStoreRunTimeException("Can not initialize database",ex);
         }
     }
 
@@ -247,6 +252,7 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
             }
             msr.addVersion(version);
         }
+        c.close();
         return results;
     }
 
@@ -271,6 +277,7 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
                 ps.executeUpdate();
             }
             result = t.delistResource(r, XAResource.TMSUCCESS);
+            conn.close();
             if (!result) throw new MapStoreRunTimeException("Can not delist resource in transaction");
         } catch (RollbackException ex) {
             e=ex;
@@ -314,6 +321,7 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
                     System.out.println(sb.toString());
                 }
             }
+            c.close();
         } catch (SQLException ex) {
             Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -340,6 +348,7 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
                 id = rs.getInt(1);
                 if (rs.next()) throw new MapStoreRunTimeException("Invalid results for find by type/name. Multiple results found");
             }
+            c.close();
             return id;
         } catch (SQLException ex) {
             Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
@@ -404,6 +413,7 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
                 ps.executeUpdate();
             }
             result = t.delistResource(r, XAResource.TMSUCCESS);
+            conn.close();
             if (!result) {
                 throw new MapStoreRunTimeException("Can not delist resource in transaction");
             }
@@ -422,6 +432,41 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
         }
         if (e != null) {
             throw new MapStoreRunTimeException(e);
+        }
+    }
+
+    @Override
+    public void shutdown() {
+        try {
+            ds.setShutdownDatabase("shutdown");
+            Connection conn = ds.getXAConnection().getConnection();
+            conn.commit();
+            conn.close();
+            ds = null;
+        } catch (SQLException ex) {
+            throw new MapStoreRunTimeException("Error while closing derby",ex);
+        }
+    }
+
+    @Override
+    public Set<Integer> findByType(String type) {
+        Set<Integer> ids = new HashSet<Integer>();
+        try {
+            Connection c = ds.getConnection();
+            String statement = dialect.getByType(type);
+            PreparedStatement ps = c.prepareStatement(statement);
+            ResultSet rs = ps.executeQuery();
+            if (rs.getMetaData().getColumnCount() != 1) {
+                throw new MapStoreRunTimeException("Invalid results for find by type/name. Can not determine column with ID");
+            }
+            while(rs.next()) {
+                ids.add(rs.getInt(1));
+            }
+            c.close();
+            return ids;
+        } catch (SQLException ex) {
+            Logger.getLogger(DerbyResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException(ex);
         }
     }
    

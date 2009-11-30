@@ -7,11 +7,14 @@ package es.uc3m.it.mapstore.transformers.impl;
 
 import es.uc3m.it.mapstore.bean.MapStoreItem;
 import es.uc3m.it.mapstore.bean.annotations.Name;
+import es.uc3m.it.mapstore.db.impl.LazyObject;
 import es.uc3m.it.mapstore.transformers.MapStoreTransformer;
 import es.uc3m.it.mapstore.transformers.exception.UnTransformableException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.logging.Level;
@@ -74,8 +77,59 @@ public class DefaultTransformer implements MapStoreTransformer<Object>{
     }
 
     @Override
-    public Object toObject(MapStoreItem item) {
-        return item;
+    public Object toObject(MapStoreItem item) throws UnTransformableException {
+        Class clazz;
+        try {
+            clazz = Class.forName(item.getType());
+        } catch (ClassNotFoundException ex) {
+            throw new UnTransformableException("Class not found: " + item.getType(),ex);
+        }
+        Object a;
+        try {
+            a = clazz.newInstance();
+        } catch (InstantiationException ex) {
+            throw new UnTransformableException("Class can not be instantiated: " + item.getType(),ex);
+        } catch (IllegalAccessException ex) {
+            throw new UnTransformableException("Illegal access: " + item.getType(),ex);
+        }
+
+        Field[] fAux = clazz.getDeclaredFields();
+        Map<String,Field> fields = new HashMap<String,Field>();
+        for (Field f :fAux) {
+            fields.put(f.getName(),f);
+        }
+
+        for (String prop : item.getProperties().keySet()) {
+            Field f = fields.get(prop);
+            Object value = null;
+            if (f != null) {
+                //En este caso no es una referencia sino el valor
+                value = item.getProperty(prop);
+            } else {
+                if (prop.startsWith(MapStoreItem.NONPROCESSABLE)) {
+                    //En este caso puede ser una referencia
+                    String aux = prop.substring(MapStoreItem.NONPROCESSABLE.length());
+                    f = fields.get(aux);
+                    if (f != null) {
+                        //En este caso es una referencia cargaremos el proxy
+                        Class classLazy = f.getType();
+                        String[] tmp = ((String)item.getProperty(prop)).split("_");
+                        value = LazyObject.newInstance(Integer.valueOf(tmp[0]), Integer.valueOf(tmp[1]), classLazy);
+                    }
+                }
+            }
+            if (f != null && value != null) {
+                try {
+                    f.setAccessible(true);
+                    f.set(a, value);
+                } catch (IllegalArgumentException ex) {
+                    throw new UnTransformableException(ex);
+                } catch (IllegalAccessException ex) {
+                    throw new UnTransformableException(ex);
+                }
+            }
+        }
+        return a;
     }
 
 

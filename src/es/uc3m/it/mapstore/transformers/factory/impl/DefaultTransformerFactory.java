@@ -27,7 +27,7 @@ public class DefaultTransformerFactory implements TransformerFactory {
     public MapStoreTransformer getFactory(Object o) {
         MapStoreTransformer tf;
         if (o.getClass().isArray()) tf = new ArrayTransformer();
-        if (o instanceof String) tf = new StringPropertyTransformer();
+        else if (o instanceof String) tf = new StringPropertyTransformer();
         else if (o instanceof MapStoreItem) tf = new MapStoreItemTransformer();
         else if (o instanceof Collection) tf = new CollectionTransformer();
         else if (o instanceof Map) tf = new MapTransformer();
@@ -37,4 +37,17 @@ public class DefaultTransformerFactory implements TransformerFactory {
         return tf;
     }
 
+    @Override
+    public MapStoreTransformer getFactory(Class c) {
+        MapStoreTransformer tf;
+        if (c.isArray()) tf = new ArrayTransformer();
+        else if (String.class.isAssignableFrom(c)) tf = new StringPropertyTransformer();
+        else if (MapStoreItem.class.isAssignableFrom(c)) tf = new MapStoreItemTransformer();
+        else if (Collection.class.isAssignableFrom(c)) tf = new CollectionTransformer();
+        else if (Map.class.isAssignableFrom(c)) tf = new MapTransformer();
+        else {
+            tf = new DefaultTransformer();
+        }
+        return tf;
+    }
 }

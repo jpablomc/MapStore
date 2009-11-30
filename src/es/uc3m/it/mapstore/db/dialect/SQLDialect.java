@@ -173,6 +173,12 @@ public abstract class SQLDialect implements MapStoreDialect {
         return "SELECT ID FROM NAME WHERE TYPE = '" + type + "' AND NAME = '" + name + "'";
     }
 
+    @Override
+    public String getByType(String type) {
+        return "SELECT ID FROM NAME WHERE TYPE = '" + type + "' ORDER BY NAME";
+    }
+
+
     private String getQueryForCondition(Number value) {
         String sql;
         if (value instanceof Integer) {

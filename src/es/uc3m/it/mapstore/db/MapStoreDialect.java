@@ -19,6 +19,7 @@ public interface MapStoreDialect {
     public Serializable createList(long id, long version, long order, String property, Object value);
     public String insertTypeName(long id, String type, String name);
     public String getByTypeName(String type, String name);
+    public String getByType(String type);
     public Serializable update(long id, long version, String property, Object value);
     public Serializable delete(long id);
 }

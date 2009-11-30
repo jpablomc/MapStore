@@ -151,12 +151,9 @@ public abstract class ResourceManagerlImpl implements ResourceManagerWrapper{
         return toReturn;
     }
     
-
-    public static String NONPROCESSABLE = "_IGNORE_";
-
     protected boolean processable(String prop) {
         boolean toProcess = true;
-        if (prop.startsWith(NONPROCESSABLE)) toProcess = false;
+        if (prop.startsWith(MapStoreItem.NONPROCESSABLE)) toProcess = false;
         return toProcess;
     }
 }

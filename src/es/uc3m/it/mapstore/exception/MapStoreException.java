@@ -16,5 +16,12 @@ public class MapStoreException extends Exception {
     public MapStoreException(String message) {
         super(message);
     }
-    
+
+    public MapStoreException(Throwable cause) {
+        super(cause);
+    }
+
+    public MapStoreException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

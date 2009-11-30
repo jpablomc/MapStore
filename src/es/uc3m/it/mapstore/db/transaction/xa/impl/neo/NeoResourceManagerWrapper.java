@@ -19,7 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import javax.naming.ldap.ManageReferralControl;
+import java.util.Set;
 import javax.sql.XAConnection;
 import javax.transaction.Transaction;
 import org.neo4j.api.core.Node;
@@ -87,12 +87,13 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
             Object value = item.getProperty(property);
             MapStoreSession session = MapStoreSession.getSession();
             MapStoreItem newItem = session.findAnonymous(value,id+"|"+property);
-            long idRef;
-            if (newItem == null) {
-                idRef = session.saveAnonymous(value,id+"|"+property);
+            int[] idRef;
+            if (session.needsUpdate(value, id+"|"+property)) {
+                if (newItem == null) idRef = session.saveAnonymous(value,id+"|"+property);
+                else idRef = session.updateAnonymous(value, name);
+            } else {
+                idRef = new int[]{newItem.getId(),newItem.getVersion()};
             }
-            else idRef = newItem.getId();
-            int id2 = Long.valueOf(idRef).intValue();
             int relType;
             if (value instanceof Collection) {
                 relType = NeoRelationship.CONTAINS;
@@ -100,12 +101,12 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
                 relType = NeoRelationship.MAPS;
             } else relType = NeoRelationship.RELATES_TO;
             int idRel = pm.getPersistenceManager().getPersistenceSource().nextId(Relationship.class);
-            manager.relationshipCreate(idRel, relType, id, id2);
+            manager.relationshipCreate(idRel, relType, id, idRef[0]);
             manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_DATE_START, item.getRecordDate().getTime());
             manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_VERSION_START, item.getVersion());
             manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_NAME, property);
             manager.nodeAddProperty(nextId, NeoPropertyIndex.getNeoPropertyIndexForVersion(item.getVersion()), item.getRecordDate().getTime());
-            item.setProperty(NONPROCESSABLE + property, id2);
+            item.setProperty(MapStoreItem.NONPROCESSABLE + property, idRef[0]+ "_" + idRef[1]);
         }
     }
 
@@ -274,19 +275,15 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
         //Recuperar las antiguas relaciones del objeto:
         Iterable<RelationshipData> relationship = manager.loadRelationships(id);
         Map<String, RelationshipData> relations = new HashMap<String, RelationshipData>();
-
+        //Creamos un mapa con las relaciones activas. La clave sera el nombre de la propiedad
         for (RelationshipData rd : manager.loadRelationships(id)) {
             if (rd.firstNode() == id) {
                 ArrayMap<Integer, PropertyData> loadRelProperties = pm.getPersistenceManager().loadRelProperties(rd.getId());
-                Long time_start = null;
                 Long time_end = null;
                 String nameProperty = null;
                 for (Integer key : loadRelProperties.keySet()) {
                     PropertyData pd = loadRelProperties.get(key);
                     switch (key) {
-                        case NeoPropertyIndex.RELATION_DATE_START_KEY:
-                            time_start = (Long) pd.getValue();
-                            break;
                         case NeoPropertyIndex.RELATION_DATE_END_KEY:
                             time_end = (Long) pd.getValue();
                             break;
@@ -295,6 +292,7 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
                             break;
                     }
                 }
+                //Si la relación esta activa la añadimos a la lista
                 if (time_end == null) {
                     relations.put(nameProperty, rd);
                 }
@@ -302,15 +300,17 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
         }
 
         List<String> props = getPropertiesToProcess(item);
+        //Recorremos las propiedades de relación
         for (String property : props) {
             Object value = item.getProperty(property);
             MapStoreSession session = MapStoreSession.getSession();
             MapStoreItem relatedItem = session.findAnonymous(value,id+"|"+property);
-            int id2;
-            if (relatedItem == null) {
-                id2 = session.saveAnonymous(value,id+"|"+property);
+            int[] id2;
+            if (session.needsUpdate(value, id+"|"+property)) {
+                if (relatedItem == null) id2 = session.saveAnonymous(value,id+"|"+property);
+                else id2 = session.updateAnonymous(value,id+"|"+property);
             } else {
-                id2 = relatedItem.getId();
+                id2 = new int[]{relatedItem.getId(),relatedItem.getVersion()};
             }
             int relType;
             if (value instanceof Collection) {
@@ -322,12 +322,12 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
             RelationshipData rd = relations.get(property);
             if (rd != null) {
                 //Existia la relación
-                if (rd.secondNode() != id2) {
+                if (rd.secondNode() != id2[0]) {
                     //Ha cambiado el destino... finalizar la antigua y crear la nueva
                     manager.relAddProperty(rd.getId(), NeoPropertyIndex.RELATION_DATE_END, item.getRecordDate().getTime());
                     manager.relAddProperty(rd.getId(), NeoPropertyIndex.RELATION_VERSION_END, item.getVersion()-1);
                     int idRel = pm.getPersistenceManager().getPersistenceSource().nextId(Relationship.class);
-                    manager.relationshipCreate(idRel, relType, id, id2);
+                    manager.relationshipCreate(idRel, relType, id, id2[0]);
                     manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_DATE_START, item.getRecordDate().getTime());
                     manager.relAddProperty(rd.getId(), NeoPropertyIndex.RELATION_VERSION_START, item.getVersion());
                     manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_NAME, property);
@@ -336,12 +336,12 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
             } else {
                 //No existia la relacion... se crea
                     int idRel = pm.getPersistenceManager().getPersistenceSource().nextId(Relationship.class);
-                    manager.relationshipCreate(idRel, relType, id, id2);
+                    manager.relationshipCreate(idRel, relType, id, id2[0]);
                     manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_DATE_START, item.getRecordDate().getTime());
                     manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_VERSION_START, item.getVersion());
                     manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_NAME, property);
             }
-            item.setProperty(NONPROCESSABLE + property, id2);
+            item.setProperty(MapStoreItem.NONPROCESSABLE + property, id2[0]+ "_" + id2[1]);
             relations.remove(property);
         }
         //Ahora queda anular las relaciones que antes estaban activas y ahora no existen
@@ -399,5 +399,15 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
     @Override
     public Integer findByNameType(String name, String type) {
         throw new UnsupportedOperationException("This resource does not support find by type/name");
+    }
+
+    @Override
+    public void shutdown() {
+        //Empty
+    }
+
+    @Override
+    public Set<Integer> findByType(String type) {
+        throw new UnsupportedOperationException("Operation is not supported");
     }
 }

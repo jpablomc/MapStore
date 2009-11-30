@@ -124,6 +124,7 @@ public class DiskXAResource extends AbstractXAResource {
 
     @Override
     protected synchronized void doRollback(Xid arg0) throws XAException {
+        Logger.getLogger(DiskXAResource.class.getName()).log(Level.INFO, "Rollingback transaction");
         Set<DiskConnection> conns = connections.get(arg0);
         for (DiskConnection conn : conns) {
             try {

@@ -41,11 +41,13 @@ public class DiskConnection extends AbstractConnection {
     private boolean autocommit;
     List<DiskOperation> operations;
     private boolean closed;
+    private List<File> commitedFiles;
 
     public DiskConnection(String path) {
         this.path = path;
         data = new HashMap<File,ByteArrayOutputStream>();
         dataDelete = new ArrayList<File>();
+        commitedFiles = new ArrayList<File>();
         autocommit = false;
         locked = new HashMap<Long,Set<Long>>();
         operations = new ArrayList<DiskOperation>();
@@ -69,6 +71,8 @@ public class DiskConnection extends AbstractConnection {
                 checkPath(f.getParent());
                 ByteArrayOutputStream bos = data.get(f);
                 bos.writeTo(new FileOutputStream(f));
+                commitedFiles.add(f);
+
             } catch (FileNotFoundException ex) {
                 Logger.getLogger(DiskConnection.class.getName()).log(Level.SEVERE, null, ex);
                 throw new SQLException(ex);
@@ -305,6 +309,22 @@ public class DiskConnection extends AbstractConnection {
     public void close() throws SQLException {
         closed = true;
     }
+
+    @Override
+    public boolean isClosed() throws SQLException {
+        return closed;
+    }
+
+    @Override
+    public void rollback() throws SQLException {
+        for (File f : commitedFiles) {
+            if (f.exists()) {
+                boolean result = f.delete();
+                if (!result) throw new SQLException("Unable to rollback");
+            }
+        }
+    }
+
 
 
 }

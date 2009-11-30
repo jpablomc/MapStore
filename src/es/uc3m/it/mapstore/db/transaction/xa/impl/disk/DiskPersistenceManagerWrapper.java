@@ -222,5 +222,15 @@ public class DiskPersistenceManagerWrapper implements PersistenceManagerWrapper{
         }
     }
 
+    @Override
+    public void shutdown() {
+        //Empty
+    }
+
+    @Override
+    public Set<Integer> findByType(String type) {
+        throw new UnsupportedOperationException("Operation is not supported");
+    }
+
 
 }

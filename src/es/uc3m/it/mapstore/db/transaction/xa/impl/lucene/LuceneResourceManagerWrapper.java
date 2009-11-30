@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.sql.XAConnection;
@@ -68,6 +69,7 @@ public class LuceneResourceManagerWrapper extends ResourceManagerlImpl {
                     System.getProperty("file.separator") + "lucene";
         }
         ds = new LuceneXADataSource(directory);
+        initDatabase();
     }
 
     @Override
@@ -231,5 +233,24 @@ public class LuceneResourceManagerWrapper extends ResourceManagerlImpl {
                 }
             }
         }
+    }
+
+    private void initDatabase() {
+        try {
+            ds.getXAConnection().getConnection().commit();
+        } catch (SQLException ex) {
+            Logger.getLogger(LuceneResourceManagerWrapper.class.getName()).log(Level.SEVERE, null, ex);
+            throw new MapStoreRunTimeException("Error initializing Lucene indexes");
+        }
+    }
+
+    @Override
+    public void shutdown() {
+        //Empty
+    }
+
+    @Override
+    public Set<Integer> findByType(String type) {
+        throw new UnsupportedOperationException("Operation is not supported");
     }
 }

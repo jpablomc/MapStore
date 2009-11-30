@@ -26,6 +26,8 @@ public class MapStoreItem implements Serializable{
     public final static String EXTRA = "_EXTRA";
     public final static String MAPCOLLECTIONARRAYPREFIX = "_PREFIX";
 
+    public static String NONPROCESSABLE = "_IGNORE_";
+
     public final static int ISCOLLECTION = 0x01;
     public final static int ISMAP = 0x02;
     public final static int ISARRAY = 0x04;
