@@ -5,7 +5,7 @@
 
 package es.uc3m.it.mapstore.db.transaction.xa;
 
-import es.uc3m.it.mapstore.bean.MapStoreCondition;
+import es.uc3m.it.mapstore.bean.MapStoreBasicCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
 import es.uc3m.it.mapstore.bean.MapStoreResult;
 import es.uc3m.it.mapstore.exception.MapStoreRunTimeException;
@@ -29,7 +29,7 @@ public void start(Properties prop) throws MapStoreRunTimeException;
 public void create(MapStoreItem item, Transaction t);
 public void update(MapStoreItem item, MapStoreItem old, Transaction t);
 public void delete(MapStoreItem item, MapStoreItem old,Transaction t);
-public Map<Integer,MapStoreResult> findByConditions(List<MapStoreCondition> cond, int flag, Date fecha);
+public MapStoreResult findByConditions(List<MapStoreBasicCondition> cond, int flag, Date fecha);
 public void getAll();
 public boolean canFindByNameType();
 public Integer findByNameType(String name, String type);

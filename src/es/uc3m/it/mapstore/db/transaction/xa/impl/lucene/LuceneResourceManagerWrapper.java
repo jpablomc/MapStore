@@ -5,7 +5,7 @@
 
 package es.uc3m.it.mapstore.db.transaction.xa.impl.lucene;
 
-import es.uc3m.it.mapstore.bean.MapStoreCondition;
+import es.uc3m.it.mapstore.bean.MapStoreBasicCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
 import es.uc3m.it.mapstore.bean.MapStoreResult;
 import es.uc3m.it.mapstore.db.transaction.xa.impl.ResourceManagerlImpl;
@@ -84,7 +84,7 @@ public class LuceneResourceManagerWrapper extends ResourceManagerlImpl {
     }
 
     @Override
-    public Map<Integer, MapStoreResult> findByConditions(List<MapStoreCondition> cond, int flag, Date fecha) {
+    public MapStoreResult findByConditions(List<MapStoreBasicCondition> cond, int flag, Date fecha) {
         LuceneConnection conn;
         try {
             conn = ds.getXAConnection().getConnection();

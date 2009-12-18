@@ -5,7 +5,7 @@
 
 package es.uc3m.it.mapstore.db.transaction.xa.impl.disk;
 
-import es.uc3m.it.mapstore.bean.MapStoreCondition;
+import es.uc3m.it.mapstore.bean.MapStoreBasicCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
 import es.uc3m.it.mapstore.bean.MapStoreResult;
 import es.uc3m.it.mapstore.db.transaction.xa.PersistenceManagerWrapper;
@@ -171,7 +171,7 @@ public class DiskPersistenceManagerWrapper implements PersistenceManagerWrapper{
     }
 
     @Override
-    public Map<Integer,MapStoreResult> findByConditions(List<MapStoreCondition> cond, int flag, Date fecha) {
+    public MapStoreResult findByConditions(List<MapStoreBasicCondition> cond, int flag, Date fecha) {
         throw new UnsupportedOperationException("This resource can not permorm searches");
     }
 

@@ -13,6 +13,7 @@ import es.uc3m.it.mapstore.transformers.exception.UnTransformableException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.SortedMap;
@@ -33,6 +34,7 @@ public class DefaultTransformer implements MapStoreTransformer<Object>{
         Field[] attributtes = object.getClass().getDeclaredFields();
         SortedMap<Integer,String> names = new TreeMap<Integer,String>();
         for (Field attrib : attributtes) {
+            if (Modifier.isStatic(attrib.getModifiers())) continue; //Ignoramos los estaticos
             //Para cada atibuto recuperamos el nombre y el valor
             String key = attrib.getName();
             Object value=null;

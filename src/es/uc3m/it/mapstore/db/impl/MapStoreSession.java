@@ -2,29 +2,31 @@
  * To change this template, choose Tools | Templates
  * and open the template in the editor.
  */
-
 package es.uc3m.it.mapstore.db.impl;
 
+import es.uc3m.it.mapstore.bean.MapStoreBasicCondition;
+import es.uc3m.it.mapstore.bean.MapStoreComplexCondition;
 import es.uc3m.it.mapstore.bean.MapStoreCondition;
+import es.uc3m.it.mapstore.bean.MapStoreExtendedItem;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
+import es.uc3m.it.mapstore.bean.MapStoreListCondition;
 import es.uc3m.it.mapstore.bean.MapStoreResult;
 import es.uc3m.it.mapstore.config.MapStoreConfig;
 import es.uc3m.it.mapstore.db.transaction.TransactionManagerWrapper;
 import es.uc3m.it.mapstore.db.transaction.xa.PersistenceManagerWrapper;
 import es.uc3m.it.mapstore.db.transaction.xa.ResourceManagerWrapper;
 import es.uc3m.it.mapstore.exception.MapStoreRunTimeException;
+import es.uc3m.it.mapstore.parser.QueryParser;
 import es.uc3m.it.mapstore.transformers.MapStoreTransformer;
 import es.uc3m.it.mapstore.transformers.exception.UnTransformableException;
 import es.uc3m.it.mapstore.transformers.factory.TransformerFactory;
 import es.uc3m.it.util.ReflectionUtils;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,7 +40,6 @@ import javax.transaction.Status;
 import javax.transaction.SystemException;
 import javax.transaction.Transaction;
 
-
 /**
  *
  * @author Pablo
@@ -48,24 +49,25 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
     private TransactionManagerWrapper tm;
     private Date initDate;
     private boolean closed;
-    private Map<Object,MapStoreItem> cache;
-
-    private static Map<Thread,MapStoreSession> sessions;
+    private Map<Object, MapStoreItem> cache;
+    private static Map<Thread, MapStoreSession> sessions;
 
     private MapStoreSession() {
         //Establecer el gestor de transacciones. Este se recupera del fichero de configuración.
         tm = (TransactionManagerWrapper) MapStoreConfig.getInstance().getObject(MapStoreConfig.TXMANAGER);
         tm.init();
         closed = false;
-        cache = new HashMap<Object,MapStoreItem>();
+        cache = new HashMap<Object, MapStoreItem>();
     }
 
     private static void startup() {
-        sessions = new HashMap<Thread,MapStoreSession>();
+        sessions = new HashMap<Thread, MapStoreSession>();
     }
 
     public static MapStoreSession getSession() {
-        if (sessions == null) startup();
+        if (sessions == null) {
+            startup();
+        }
         MapStoreSession s = sessions.get(Thread.currentThread());
         if (s == null || s.closed) {
             s = new MapStoreSession();
@@ -73,7 +75,7 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         }
         return s;
     }
-    
+
     public boolean isClosed() {
         return closed;
     }
@@ -100,7 +102,7 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
                 }
                 Logger.getLogger(MapStoreSession.class.getName()).log(Level.WARNING, "Closed session with active transaction");
                 break;
-        }        
+        }
     }
 
     @Override
@@ -114,10 +116,10 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
             initDate = new Date();
         } catch (NotSupportedException ex) {
             Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);
-            throw new MapStoreRunTimeException("Can not create transaction: Operation unsupported",ex);
+            throw new MapStoreRunTimeException("Can not create transaction: Operation unsupported", ex);
         } catch (SystemException ex) {
             Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);
-            throw new MapStoreRunTimeException("Can not obtain transaction",ex);
+            throw new MapStoreRunTimeException("Can not obtain transaction", ex);
         }
     }
 
@@ -159,7 +161,9 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
             e = ex;
             Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);
         }
-        if (e != null) throw new MapStoreRunTimeException(e);
+        if (e != null) {
+            throw new MapStoreRunTimeException(e);
+        }
     }
 
     public void rollback() {
@@ -174,7 +178,46 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         }
     }
 
-    private boolean needsUpdateArray(Object[] newObject, Object[] oldObject){
+    private List<MapStoreItem> filterActiveObjects(MapStoreResult result) {
+        List<MapStoreItem> toReturn = new ArrayList<MapStoreItem>();
+        List<MapStoreItem> toFilter = recoverById(result.getIds()); //Va a recuperar la ultima versión
+        for (MapStoreItem item : toFilter) {
+            int id = item.getId();
+            int vers = item.getVersion();
+            if (result.getVersionsForId(id).contains(vers)) {
+                toReturn.add(item);
+            }
+        }
+        return toReturn;
+    }
+
+    private List<MapStoreItem> filterActiveOnDate(Date fecha, MapStoreResult results) {
+        List<MapStoreItem> toReturn = new ArrayList<MapStoreItem>();
+        Map<Integer, Set<Integer>> request = new HashMap<Integer, Set<Integer>>();
+        for (Integer i : results.getIds()) {
+            Set<Integer> versions = results.getVersionsForId(i);
+            Set<Integer> versionsNeeded = new HashSet<Integer>();
+            for (Integer ver : versions) {
+                versionsNeeded.add(ver);
+                versionsNeeded.add(ver + 1);
+            }
+            request.put(i, versionsNeeded);
+        }
+        Map<Integer, Map<Integer, MapStoreItem>> toFilter = recoverByIdVersion(request);
+        for (Integer i : results.getIds()) {
+            Map<Integer, MapStoreItem> versions = toFilter.get(i);
+            for (Integer currentVer : results.getVersionsForId(i)) {
+                MapStoreItem current = versions.get(currentVer);
+                MapStoreItem next = versions.get(currentVer + 1);
+                if (current.getRecordDate().compareTo(fecha) <= 0 && next.getRecordDate().after(fecha)) {
+                    toReturn.add(current);
+                }
+            }
+        }
+        return toReturn;
+    }
+
+    private boolean needsUpdateArray(Object[] newObject, Object[] oldObject) {
         boolean needsUpdate;
         //Los objetos son arrays se convierten a listas y se comparan
         List c1 = Arrays.asList(newObject);
@@ -182,7 +225,6 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         needsUpdate = needsUpdateList(c1, c2);
         return needsUpdate;
     }
-
 
     /**
      *
@@ -196,16 +238,16 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
      * @throws UnTransformableException
      */
     private boolean needsUpdateCollection(Collection newObject, Collection oldObject) {
-        boolean needsUpdate = false;;
+        boolean needsUpdate = false;
+        ;
         //Los objetos son colecciones
         Collection c1 = newObject;
         Collection c2 = oldObject;
         if ((c1.size() != c2.size()) || (!c1.containsAll(c2))) {
             needsUpdate = true;
-        } 
+        }
         return needsUpdate;
     }
-
 
     /**
      *
@@ -218,7 +260,7 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
      * @return Devuelve si detecta que debe ser actualizado
      * @throws UnTransformableException
      */
-    private boolean needsUpdateList(List newObject, List oldObject){
+    private boolean needsUpdateList(List newObject, List oldObject) {
         boolean needsUpdate = false;
         //Los objetos son listas
         List c1 = newObject;
@@ -235,10 +277,14 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
                 //Tenemos dos casos a evaluar, ahora es nulo, o por equals
                 //Caso es nulo... si el antiguo no es nulo hay que actualizar
                 if (newValue == null) {
-                    if (oldValue != null) needsUpdate = true;
+                    if (oldValue != null) {
+                        needsUpdate = true;
+                    }
                 } else {
                     //El equals se deberá implementarse en el objeto
-                    if (!newValue.equals(oldValue)) needsUpdate = true;
+                    if (!newValue.equals(oldValue)) {
+                        needsUpdate = true;
+                    }
                 }
                 i++;
             }
@@ -270,7 +316,7 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
                 r.create(item, t);
             }
             pm.create(item, t);
-            return new int[] {item.getId(),item.getVersion()};
+            return new int[]{item.getId(), item.getVersion()};
         } catch (SystemException ex) {
             Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);
             throw new MapStoreRunTimeException(ex);
@@ -280,7 +326,9 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
     public int[] saveAnonymous(Object o, String name) {
         try {
             MapStoreItem i = MapStoreConfig.getInstance().getTransformerFactory().getFactory(o).toStore(o);
-            if (i.getName() == null) i.setName(name);
+            if (i.getName() == null) {
+                i.setName(name);
+            }
             return save(i);
         } catch (UnTransformableException ex) {
             Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);
@@ -288,7 +336,7 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         }
     }
 
-    public int[] save(Object o){
+    public int[] save(Object o) {
         try {
             MapStoreItem i = MapStoreConfig.getInstance().getTransformerFactory().getFactory(o).toStore(o);
             return save(i);
@@ -309,7 +357,6 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         return version.intValue();
     }
 
-
     private boolean processProperty(String property) {
         //TODO: ESTABLECER REGLA PARA IGNORAR PROPIEDADES INTERNAS DEL OBJETO
         return true;
@@ -325,17 +372,18 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         }
     }
 
-    public int[] updateAnonymous(Object o,String name) {
+    public int[] updateAnonymous(Object o, String name) {
         try {
             MapStoreItem i = MapStoreConfig.getInstance().getTransformerFactory().getFactory(o).toStore(o);
-            if (i.getName() == null) i.setName(name);
+            if (i.getName() == null) {
+                i.setName(name);
+            }
             return update(i);
         } catch (UnTransformableException ex) {
             Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);
             throw new MapStoreRunTimeException(ex);
         }
     }
-
 
     private int[] update(MapStoreItem item) {
         try {
@@ -348,31 +396,32 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
             PersistenceManagerWrapper pm = MapStoreConfig.getInstance().getPersistenceResourceLookup();
             Transaction t = tm.getTransactionManager().getTransaction();
             for (ResourceManagerWrapper r : resources) {
-                r.update(item, old,  t);
+                r.update(item, old, t);
             }
             pm.update(item, old, t);
-            return new int[]{item.getId(),item.getVersion()};
+            return new int[]{item.getId(), item.getVersion()};
         } catch (SystemException ex) {
             Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);
             throw new MapStoreRunTimeException(ex);
         }
     }
-
-    private final static String[] NONDELETABLEPROPERTIES = {MapStoreItem.ID,MapStoreItem.NAME,MapStoreItem.RECORDDATE,MapStoreItem.TYPE,MapStoreItem.VERSION};
+    private final static String[] NONDELETABLEPROPERTIES = {MapStoreItem.ID, MapStoreItem.NAME, MapStoreItem.RECORDDATE, MapStoreItem.TYPE, MapStoreItem.VERSION};
 
     public void delete(Object obj) {
         try {
             MapStoreItem i = findByNameType(obj);
-            if (i != null) delete(i);
+            if (i != null) {
+                delete(i);
+            }
         } catch (UnTransformableException ex) {
             Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);
             throw new MapStoreRunTimeException(ex);
         }
     }
 
-    public void delete(int id) {
-            MapStoreItem i = recoverById(id);
-            delete(i);
+    public void delete(Integer id) {
+        MapStoreItem i = recoverById(id);
+        delete(i);
     }
 
     private void delete(MapStoreItem item) {
@@ -384,7 +433,7 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
             item.setVersion(getNextVersion(old.getId()));
             item.setRecordDate(initDate);
             Set<String> clone = new HashSet<String>(item.getProperties().keySet());
-            for (String aux: clone) {
+            for (String aux : clone) {
                 if (!nonDeletable.contains(aux)) {
                     item.setProperty(aux, null);
                 }
@@ -399,7 +448,8 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         } catch (SystemException ex) {
             Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);
             throw new MapStoreRunTimeException(ex);
-        }    }
+        }
+    }
 
     private int getTransactionStatus() {
         try {
@@ -410,7 +460,7 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         }
     }
 
-    public MapStoreItem findAnonymous(Object o,String name) {
+    public MapStoreItem findAnonymous(Object o, String name) {
         MapStoreItem item;
         //Buscar en la cache de la sesión
         item = cache.get(o);
@@ -436,7 +486,6 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         return item;
     }
 
-
     public MapStoreItem find(Object o) {
         MapStoreItem item;
         //Buscar en la cache de la sesión
@@ -448,7 +497,9 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
             } catch (UnTransformableException ex) {
                 Logger.getLogger(MapStoreSession.class.getName()).log(Level.WARNING, null, ex);
             }
-            if (item != null) cache.put(o,item);
+            if (item != null) {
+                cache.put(o, item);
+            }
         }
         return item;
     }
@@ -466,34 +517,41 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         return toReturn;
     }
 
-    public MapStoreItem findByNameType(String name,String type) {
+    public MapStoreItem findByNameType(String name, String type) {
         Collection<ResourceManagerWrapper> resources = MapStoreConfig.getInstance().getXAResourceLookup();
         List<ResourceManagerWrapper> resByName = new ArrayList<ResourceManagerWrapper>();
-        for(ResourceManagerWrapper r : resources) {
-            if (r.canFindByNameType()) resByName.add(r);
+        for (ResourceManagerWrapper r : resources) {
+            if (r.canFindByNameType()) {
+                resByName.add(r);
+            }
         }
         ResourceManagerWrapper r = BalanceLoad.getLessLoadedAndIncrease(resByName, 2);
         Integer id = r.findByNameType(name, type);
         BalanceLoad.decreaseLoad(r, 2);
         MapStoreItem toReturn = null;
-        if (id != null) toReturn = recoverById(id);
+        if (id != null) {
+            toReturn = recoverById(id);
+        }
         return toReturn;
     }
 
     public List<MapStoreItem> findByType(String type) {
         Collection<ResourceManagerWrapper> resources = MapStoreConfig.getInstance().getXAResourceLookup();
         List<ResourceManagerWrapper> resByName = new ArrayList<ResourceManagerWrapper>();
-        for(ResourceManagerWrapper r : resources) {
-            if (r.canFindByNameType()) resByName.add(r);
+        for (ResourceManagerWrapper r : resources) {
+            if (r.canFindByNameType()) {
+                resByName.add(r);
+            }
         }
         ResourceManagerWrapper r = BalanceLoad.getLessLoadedAndIncrease(resByName, 1);
         Set<Integer> id = r.findByType(type);
         BalanceLoad.decreaseLoad(r, 1);
         List<MapStoreItem> toReturn = null;
-        if (id != null) toReturn = recoverById(id);
+        if (id != null) {
+            toReturn = recoverById(id);
+        }
         return toReturn;
     }
-
 
     public <T> T findByNameType(String name, Class<T> c) {
         try {
@@ -516,8 +574,8 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
             List<T> toReturn = new ArrayList<T>();
             if (items != null && !items.isEmpty()) {
                 MapStoreTransformer<T> trans = MapStoreConfig.getInstance().getTransformerFactory().getFactory(c);
-                for (MapStoreItem i :items) {
-                toReturn.add(trans.toObject(i));
+                for (MapStoreItem i : items) {
+                    toReturn.add(trans.toObject(i));
                 }
             }
             return toReturn;
@@ -526,13 +584,37 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
             throw new MapStoreRunTimeException(ex);
         }
     }
-
     public final static int CONJUNCTIVE_SEARCH = 0;
     public final static int DISJUNCTIVE_SEARCH = 1;
 
-    public <T> List<T> findByConditions(Class<T> a,MapStoreCondition[] conditions,int flag,Date fecha) {
+    public <T> List<MapStoreExtendedItem<T>> queryExtended(Class<T> a, String query, Date fecha) {
+        MapStoreCondition condition = QueryParser.queryToConditions(query);
+        List<MapStoreExtendedItem<T>> results = new ArrayList<MapStoreExtendedItem<T>>();
+        List<MapStoreItem> items = query(condition, fecha);
+        MapStoreTransformer<T> trans = MapStoreConfig.getInstance().getTransformerFactory().getFactory(a);
+        for (MapStoreItem item : items) {
+            try {
+                MapStoreExtendedItem<T> object = new MapStoreExtendedItem<T>(
+                        item.getName(), item.getId(), item.getVersion(),
+                        item.getRecordDate(), item.isDeleted(),
+                        trans.toObject(item));
+                results.add(object);
+            } catch (UnTransformableException ex) {
+                Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);
+                throw new MapStoreRunTimeException(ex);
+            }
+        }
+        return results;
+    }
+
+    public <T> List<T> query(Class<T> a, String query, Date fecha) {
+        MapStoreCondition c = QueryParser.queryToConditions(query);
+        return query(a, c, fecha);
+    }
+
+    public <T> List<T> query(Class<T> a, MapStoreCondition condition, Date fecha) {
         List<T> results = new ArrayList<T>();
-        List<MapStoreItem> items = findByConditions(conditions, flag, fecha);
+        List<MapStoreItem> items = query(condition, fecha);
         MapStoreTransformer<T> trans = MapStoreConfig.getInstance().getTransformerFactory().getFactory(a);
         for (MapStoreItem item : items) {
             try {
@@ -545,101 +627,76 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         return results;
     }
 
-    public List<MapStoreItem> findByConditions(MapStoreCondition[] conditions,int flag,Date fecha) {
-        Map<Integer,MapStoreResult> items=null;
-        Map<Class,List<MapStoreCondition>> mapa = new HashMap<Class, List<MapStoreCondition>>();
-        for (MapStoreCondition c: conditions) {
-            Class clazz = null;
-            if (c.getValue() instanceof Collection) {
-                clazz = ReflectionUtils.determineGenericType((Collection)c.getValue());
-            } else clazz = c.getType();
-            List<MapStoreCondition> list = mapa.get(clazz);
-            if (list == null) {
-                list = new ArrayList<MapStoreCondition>();
-                mapa.put(clazz,list);
-            }
-            list.add(c);
-        }
-        for (Class c : mapa.keySet()) {
-            List<MapStoreCondition> cond = mapa.get(c);
-            List<ResourceManagerWrapper> resources = MapStoreConfig.getInstance().getXaResourceLookupForClass(c);
-            ResourceManagerWrapper r = BalanceLoad.getLessLoadedAndIncrease(resources, cond.size());
-            Map<Integer,MapStoreResult> aux = r.findByConditions(cond,flag,fecha);
-            if (items == null) {
-                items = aux;
-            } else {
-                switch (flag) {
-                    case CONJUNCTIVE_SEARCH:
-                        //Primero borramos los documentos no comunes
-                        //acumulados va a tener los elementos a mantener
-                        Set<Integer> acumulados = items.keySet();
-                        //acumulados2 va a tener los elementos a eliminar
-                        Set<Integer> acumulados2 = items.keySet();
-                        Set<Integer> newResults = aux.keySet();
-                        acumulados.retainAll(newResults);
-                        acumulados2.removeAll(acumulados);
-                        for (Integer toDelete : acumulados2) {
-                            items.remove(toDelete);
-                        }
-                        //En el mapa ahora solo quedan los documentos comunes... debemos tratar las versiones
-                        for (Integer id : acumulados) {
-                            MapStoreResult oldResults = items.get(id);
-                            MapStoreResult searchResults = aux.get(id);
-                            oldResults.getVersions().retainAll(searchResults.getVersions());
-                        }
-                        break;
-                    case DISJUNCTIVE_SEARCH:
-                        //Añadimos todos los elementos
-                        for (Integer id : aux.keySet()) {
-                            MapStoreResult oldResults = items.get(id);
-                            MapStoreResult searchResults = aux.get(id);
-                            if (oldResults == null) items.put(id,searchResults);
-                            else oldResults.getVersions().addAll(searchResults.getVersions());
-                        }                        
-                        break;
-                }
-            }
-            BalanceLoad.decreaseLoad(r, cond.size());
-        }
-        List<MapStoreItem> toReturn = new ArrayList<MapStoreItem>();
+    public List<MapStoreItem> query(String query, Date fecha) {
+        MapStoreCondition c = QueryParser.queryToConditions(query);
+        return query(c, fecha);
+    }
+
+    public List<MapStoreItem> query(MapStoreCondition condition, Date fecha) {
+        MapStoreResult results = findByCondition(condition, fecha);
+        List<MapStoreItem> toReturn;
         if (fecha != null) {
-            Map<Integer,Set<Integer>> request = new HashMap<Integer, Set<Integer>>();
-            for (Integer i: items.keySet()) {
-                MapStoreResult res = items.get(i);
-                Set<Integer> versionsNeeded = new HashSet<Integer>();
-                for (Integer ver : res.getVersions()) {
-                    versionsNeeded.add(ver);
-                    versionsNeeded.add(ver+1);
-                }
-                request.put(i, versionsNeeded);
-            }
-            Map<Integer,Map<Integer,MapStoreItem>> toFilter = recoverByIdVersion(request);
-            for (Integer i: items.keySet()) {
-                MapStoreResult res = items.get(i);
-                Map<Integer,MapStoreItem> versions = toFilter.get(i);
-                for (Integer currentVer :res.getVersions()) {
-                    MapStoreItem current = versions.get(currentVer);
-                    MapStoreItem next = versions.get(currentVer+1);
-                    if (current.getRecordDate().compareTo(fecha) <= 0 && next.getRecordDate().after(fecha)) {
-                        toReturn.add(current);
-                    }
-                }
-            }
-        }else {
-            List<MapStoreItem> toFilter = recoverById(items.keySet()); //Va a recuperar la ultima versión
-            for (MapStoreItem item : toFilter) {
-                int id = item.getId();
-                int vers = item.getVersion();
-                MapStoreResult res = items.get(id);
-                if (res.getVersions().contains(vers)) {
-                    toReturn.add(item);
-                }
-            }
+            toReturn = filterActiveOnDate(fecha, results);
+        } else {
+            toReturn = filterActiveObjects(results);
         }
         return toReturn;
     }
 
-    private Map<Integer,Map<Integer,MapStoreItem>> recoverByIdVersion(Map<Integer,Set<Integer>> request) {
+    private MapStoreResult findByCondition(MapStoreCondition condition, Date fecha) {
+        MapStoreResult results;
+        if (condition instanceof MapStoreBasicCondition) {
+            MapStoreBasicCondition basic = (MapStoreBasicCondition) condition;
+            results = findByCondition(basic, fecha);
+        } else if (condition instanceof MapStoreComplexCondition) {
+            MapStoreComplexCondition complex = (MapStoreComplexCondition) condition;
+            results = findByCondition(complex, fecha);
+        } else if (condition instanceof MapStoreListCondition) {
+            MapStoreListCondition list = (MapStoreListCondition) condition;
+            results = findByCondition(list, fecha);
+        } else {
+            throw new IllegalArgumentException("Condition with type: " + condition.getClass() + " is not supported");
+        }
+        return results;
+    }
+
+    private MapStoreResult findByCondition(MapStoreBasicCondition condition, Date fecha) {
+        Class clazz = null;
+        if (condition.getValue() instanceof Collection) {
+            clazz = ReflectionUtils.determineGenericType((Collection) condition.getValue());
+        } else {
+            clazz = condition.getType();
+        }
+        List<ResourceManagerWrapper> resources = MapStoreConfig.getInstance().getXaResourceLookupForClass(clazz);
+        ResourceManagerWrapper r = BalanceLoad.getLessLoadedAndIncrease(resources, 1);
+        List<MapStoreBasicCondition> cond = new ArrayList<MapStoreBasicCondition>();
+        cond.add(condition);
+        MapStoreResult results = r.findByConditions(cond, CONJUNCTIVE_SEARCH, fecha);
+        BalanceLoad.decreaseLoad(r, 1);
+        return results;
+    }
+
+    private MapStoreResult findByCondition(MapStoreComplexCondition condition, Date fecha) {
+        Set<MapStoreCondition> conds = condition.getRequieredConditions();
+        for (MapStoreCondition c : conds) {
+            MapStoreResult partial = findByCondition(c, fecha);
+            condition.setResultsForCondition(c, partial);
+        }
+        MapStoreBasicCondition basic = condition.convertToBasicCondition();
+        return findByCondition(basic, fecha);
+    }
+
+    private MapStoreResult findByCondition(MapStoreListCondition condition, Date fecha) {
+        Set<MapStoreCondition> cond = condition.getRequieredConditions();
+        for (MapStoreCondition c : cond) {
+            //TODO: Combinar busquedas
+            MapStoreResult aux = findByCondition(c, fecha);
+            condition.setResultsForCondition(c, aux);
+        }
+        return condition.getResults();
+    }
+
+    private Map<Integer, Map<Integer, MapStoreItem>> recoverByIdVersion(Map<Integer, Set<Integer>> request) {
         PersistenceManagerWrapper pm = MapStoreConfig.getInstance().getPersistenceResourceLookup();
         return pm.recoverByIdVersion(request);
     }
@@ -657,12 +714,38 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         return items.get(0);
     }
 
+    public <T> MapStoreExtendedItem<T> recoverExtendedById(int id, Class<T> clazz) {
+        MapStoreItem item = recoverById(id);
+        MapStoreTransformer<T> trans = MapStoreConfig.getInstance().getTransformerFactory().getFactory(clazz);
+        try {
+            T value = trans.toObject(item);
+            MapStoreExtendedItem<T> object = new MapStoreExtendedItem<T>(
+                                item.getName(), item.getId(), item.getVersion(),
+                                item.getRecordDate(), item.isDeleted(),
+                                value);
+            return object;
+        } catch (UnTransformableException ex) {
+            throw new MapStoreRunTimeException(ex);
+        }
+
+    }
+
+    public <T> T recoverById(int id, Class<T> clazz) {
+        MapStoreItem item = recoverById(id);
+        MapStoreTransformer<T> trans = MapStoreConfig.getInstance().getTransformerFactory().getFactory(clazz);
+        try {
+            return trans.toObject(item);
+        } catch (UnTransformableException ex) {
+            throw new MapStoreRunTimeException(ex);
+        }
+    }
+
     public <T> T recoverByIdVersion(int id, int version, Class<T> clazz) {
-        Map<Integer,Set<Integer>> mapa= new HashMap<Integer,Set<Integer>>();
+        Map<Integer, Set<Integer>> mapa = new HashMap<Integer, Set<Integer>>();
         Set<Integer> set = new HashSet<Integer>();
         set.add(version);
         mapa.put(id, set);
-        Map<Integer,Map<Integer,MapStoreItem>> result = recoverByIdVersion(mapa);
+        Map<Integer, Map<Integer, MapStoreItem>> result = recoverByIdVersion(mapa);
         MapStoreItem item = result.get(id).get(version);
         T toReturn = null;
         if (item != null) {
@@ -676,7 +759,6 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         }
         return toReturn;
     }
-
 
     public void getAll() {
         Collection<ResourceManagerWrapper> resources = MapStoreConfig.getInstance().getXAResourceLookup();
@@ -694,7 +776,7 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
      * @return Devuelve si es necesario actualizar
      * @throws UnTransformableException
      */
-    public boolean needsUpdate(Object newObject, String name){
+    public boolean needsUpdate(Object newObject, String name) {
         boolean needsUpdate = false;
         MapStoreItem newItem;
         try {
@@ -702,19 +784,22 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         } catch (UnTransformableException ex) {
             throw new MapStoreRunTimeException(ex);
         }
-        if (newItem.getName() != null) name = newItem.getName();
+        if (newItem.getName() != null) {
+            name = newItem.getName();
+        }
         Object oldObject = findByNameType(name, newObject.getClass());
         //Procesamos el objeto según el tipo.... (Lista,Array, Coleccion, Mapa, Tipo Complejo
         //Se distinguen las listas de las colecciones ya que estas deben respetar el orden
         //No hay tipos basicos ya que estos se actualizan siempre
         //Caso Lista...
-        if (oldObject == null) needsUpdate = true;
-        else if (newObject instanceof List) {
-            needsUpdate = needsUpdateList((List)newObject, (List)oldObject);
+        if (oldObject == null) {
+            needsUpdate = true;
+        } else if (newObject instanceof List) {
+            needsUpdate = needsUpdateList((List) newObject, (List) oldObject);
         } else if (newObject instanceof Collection) {
-            needsUpdate = needsUpdateCollection((Collection)newObject, (Collection)oldObject);
+            needsUpdate = needsUpdateCollection((Collection) newObject, (Collection) oldObject);
         } else if (newObject.getClass().isArray()) {
-            needsUpdateArray((Object[])newObject, (Object[])oldObject);
+            needsUpdateArray((Object[]) newObject, (Object[]) oldObject);
         } else if (newObject instanceof Map) {
             needsUpdate = needsUpdateMap(newObject, oldObject);
         } else if (!newObject.equals(oldObject)) {
@@ -725,11 +810,10 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
 
     public void shutdown() {
         Collection<ResourceManagerWrapper> res = MapStoreConfig.getInstance().getXAResourceLookup();
-        for (ResourceManagerWrapper r: res) {
+        for (ResourceManagerWrapper r : res) {
             r.shutdown();
         }
         PersistenceManagerWrapper pm = MapStoreConfig.getInstance().getPersistenceResourceLookup();
         pm.shutdown();
     }
-
 }

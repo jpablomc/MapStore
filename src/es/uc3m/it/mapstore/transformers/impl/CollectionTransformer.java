@@ -11,6 +11,7 @@ import es.uc3m.it.mapstore.transformers.MapStoreTransformer;
 import es.uc3m.it.mapstore.transformers.exception.UnTransformableException;
 import es.uc3m.it.util.ReflectionUtils;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -34,7 +35,10 @@ public class CollectionTransformer implements MapStoreTransformer<Collection<? e
             item.setProperty(PROP_STRING + i, o);
             i++;
         }
-        item.setType(collection.getClass().getName());
+        //Parche para la clase devuelta por Arrays que no es instanciable. Se sustituye por ArrayList que es el tipo que construye
+        Class aux = Arrays.asList(new Object[0]).getClass();
+        if (collection.getClass().getName().equals(aux.getName())) item.setType(ArrayList.class.getName());
+        else item.setType(collection.getClass().getName());
         item.setProperty(GENERIC_STRING, ReflectionUtils.determineGenericType(collection).getName());
         item.setExtra(MapStoreItem.ISCOLLECTION);
         item.setPrefix(PROP_STRING);
@@ -46,6 +50,7 @@ public class CollectionTransformer implements MapStoreTransformer<Collection<? e
         //Notese que en tiempode ejecución las colecciones carecen de genericos... por lo que no es necesario devolver el objeto con generico
         String clazzName = item.getType();
         try {
+            System.out.println(item.getId() + " - " +clazzName);
             Collection col = (Collection) Class.forName(clazzName).newInstance();
             List<String> propertiesToProcess = getPropertiesToProcess(item);
             for (String property : propertiesToProcess) {

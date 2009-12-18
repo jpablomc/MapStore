@@ -5,7 +5,7 @@
 
 package es.uc3m.it.mapstore.db.transaction.xa.impl;
 
-import es.uc3m.it.mapstore.bean.MapStoreCondition;
+import es.uc3m.it.mapstore.bean.MapStoreBasicCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
 import es.uc3m.it.mapstore.bean.MapStoreResult;
 import es.uc3m.it.mapstore.db.dialect.SQLDialect;
@@ -189,11 +189,11 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
     }
 
     @Override
-    public Map<Integer,MapStoreResult> findByConditions(List<MapStoreCondition> cond, int flag, Date fecha) {
-        Map<Integer,MapStoreResult> results = null;
-        for (MapStoreCondition c : cond) {
+    public MapStoreResult findByConditions(List<MapStoreBasicCondition> cond, int flag, Date fecha) {
+        MapStoreResult results = null;
+        for (MapStoreBasicCondition c : cond) {
             String sql = dialect.getQueryForCondition(c);
-            Map<Integer, MapStoreResult> aux;
+            MapStoreResult aux;
             try {
                  aux = findByQuery(sql);
             } catch (SQLException ex) {
@@ -204,32 +204,10 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
             else {
                 switch (flag) {
                     case MapStoreSession.CONJUNCTIVE_SEARCH:
-                        //Primero borramos los documentos no comunes
-                        //acumulados va a tener los elementos a mantener
-                        Set<Integer> acumulados = results.keySet();
-                        //acumulados2 va a tener los elementos a eliminar
-                        Set<Integer> acumulados2 = results.keySet();
-                        Set<Integer> newResults = aux.keySet();
-                        acumulados.retainAll(newResults);
-                        acumulados2.removeAll(acumulados);
-                        for (Integer toDelete : acumulados2) {
-                            results.remove(toDelete);
-                        }
-                        //En el mapa ahora solo quedan los documentos comunes... debemos tratar las versiones
-                        for (Integer id : acumulados) {
-                            MapStoreResult oldResults = results.get(id);
-                            MapStoreResult searchResults = aux.get(id);
-                            oldResults.getVersions().retainAll(searchResults.getVersions());
-                        }
+                        results.and(aux);
                         break;
                     case MapStoreSession.DISJUNCTIVE_SEARCH:
-                        //Añadimos todos los elementos
-                        for (Integer id : aux.keySet()) {
-                            MapStoreResult oldResults = results.get(id);
-                            MapStoreResult searchResults = aux.get(id);
-                            if (oldResults == null) results.put(id,searchResults);
-                            else oldResults.getVersions().addAll(searchResults.getVersions());
-                        }
+                        results.or(aux);
                         break;
                 }
             }
@@ -237,23 +215,19 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
         return results;
     }
 
-    private Map<Integer,MapStoreResult> findByQuery(String query) throws SQLException {
+    private MapStoreResult findByQuery(String query) throws SQLException {
         Map<Integer,MapStoreResult> results = new HashMap<Integer, MapStoreResult>();
         Connection c = ds.getConnection();
         PreparedStatement ps = c.prepareStatement(query);
         ResultSet rs = ps.executeQuery();
+        MapStoreResult msr = new MapStoreResult();
         while (rs.next()) {
             int id = rs.getInt(1);
             int version = rs.getInt(2);
-            MapStoreResult msr = results.get(id);
-            if (msr == null) {
-                msr = new MapStoreResult(id);
-                results.put(id, msr);
-            }
-            msr.addVersion(version);
+            msr.addIdVersion(id, version);
         }
         c.close();
-        return results;
+        return msr;
     }
 
     @Override
@@ -274,6 +248,7 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
                 String sql = dialect.create(id, version, property, value);
                 PreparedStatement ps;
                 ps = conn.prepareStatement(sql);
+                System.out.println(sql);
                 ps.executeUpdate();
             }
             result = t.delistResource(r, XAResource.TMSUCCESS);
@@ -440,12 +415,14 @@ public class DerbyResourceManagerWrapper extends ResourceManagerlImpl{
         try {
             ds.setShutdownDatabase("shutdown");
             Connection conn = ds.getXAConnection().getConnection();
-            conn.commit();
-            conn.close();
-            ds = null;
         } catch (SQLException ex) {
-            throw new MapStoreRunTimeException("Error while closing derby",ex);
+            if (( (ex.getErrorCode() == 45000)
+                            && ("08006".equals(ex.getSQLState()) ))) {
+                //Cierre correcto
+                ds = null;
+            } else throw new MapStoreRunTimeException("Can not shutdown Derby", ex);
         }
+        
     }
 
     @Override

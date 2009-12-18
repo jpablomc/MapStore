@@ -1,6 +1,7 @@
 
-import es.uc3m.it.mapstore.bean.MapStoreCondition;
+import es.uc3m.it.mapstore.bean.MapStoreBasicCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
+import es.uc3m.it.mapstore.bean.MapStoreListCondition;
 import es.uc3m.it.mapstore.bean.annotations.Name;
 import es.uc3m.it.mapstore.db.impl.MapStoreSession;
 import es.uc3m.it.mapstore.parser.TextToNumber;
@@ -137,19 +138,21 @@ public class Main {
     private static void test() {
         MapStoreSession instance = MapStoreSession.getSession();
 
-        MapStoreCondition c1 = new MapStoreCondition("_ID", Arrays.asList(new Double[]{1.0,3.0}), MapStoreCondition.OP_BETWEEN);
-        MapStoreCondition c2 = new MapStoreCondition("_ID", new Double(4), MapStoreCondition.OP_BIGGEROREQUALSTHAN);
-        MapStoreCondition c3 = new MapStoreCondition("_ID", instance, MapStoreCondition.OP_BIGGERTHAN);
-        MapStoreCondition c4 = new MapStoreCondition("texto", "la", MapStoreCondition.OP_EQUALS);
-        MapStoreCondition c5 = new MapStoreCondition("_ID", instance, MapStoreCondition.OP_IN);
-        MapStoreCondition c6 = new MapStoreCondition("_ID", instance, MapStoreCondition.OP_LESSOREQUALSTHAN);
-        MapStoreCondition c7 = new MapStoreCondition("_ID", instance, MapStoreCondition.OP_LESSTHAN);
-        MapStoreCondition c8 = new MapStoreCondition("texto", "lugar", MapStoreCondition.OP_NOTEQUALS);
-        MapStoreCondition c9 = new MapStoreCondition("texto", "un lugar", MapStoreCondition.OP_PHRASE);
-        //MapStoreCondition c10 = new MapStoreCondition(null, instance, MapStoreCondition.OP_RELATED);
-        MapStoreCondition c11 = new MapStoreCondition("texto", "lugar", MapStoreCondition.OP_SIMILARITY);
-        MapStoreCondition[] conditions = new MapStoreCondition[]{c2};
-        List<MapStoreItem> items = instance.findByConditions(conditions, MapStoreSession.DISJUNCTIVE_SEARCH,null);
+        MapStoreBasicCondition c1 = new MapStoreBasicCondition("_ID", Arrays.asList(new Double[]{1.0,3.0}), MapStoreBasicCondition.OP_BETWEEN);
+        MapStoreBasicCondition c2 = new MapStoreBasicCondition("_ID", new Double(4), MapStoreBasicCondition.OP_BIGGEROREQUALSTHAN);
+        MapStoreBasicCondition c3 = new MapStoreBasicCondition("_ID", instance, MapStoreBasicCondition.OP_BIGGERTHAN);
+        MapStoreBasicCondition c4 = new MapStoreBasicCondition("texto", "la", MapStoreBasicCondition.OP_EQUALS);
+        MapStoreBasicCondition c5 = new MapStoreBasicCondition("_ID", instance, MapStoreBasicCondition.OP_IN);
+        MapStoreBasicCondition c6 = new MapStoreBasicCondition("_ID", instance, MapStoreBasicCondition.OP_LESSOREQUALSTHAN);
+        MapStoreBasicCondition c7 = new MapStoreBasicCondition("_ID", instance, MapStoreBasicCondition.OP_LESSTHAN);
+        MapStoreBasicCondition c8 = new MapStoreBasicCondition("texto", "lugar", MapStoreBasicCondition.OP_NOTEQUALS);
+        MapStoreBasicCondition c9 = new MapStoreBasicCondition("texto", "un lugar", MapStoreBasicCondition.OP_PHRASE);
+        MapStoreBasicCondition c10 = new MapStoreBasicCondition(null, instance, MapStoreBasicCondition.OP_RELATED);
+        MapStoreBasicCondition c11 = new MapStoreBasicCondition("texto", "lugar", MapStoreBasicCondition.OP_SIMILARITY);
+        MapStoreListCondition conditions = new MapStoreListCondition(true);
+        conditions.addCondition(c1);
+        conditions.addCondition(c2);
+        List<MapStoreItem> items = instance.query(conditions, null);
         for (MapStoreItem i : items) {
             for (String key : i.getProperties().keySet()) {
                 Object value = i.getProperty(key);
@@ -161,12 +164,14 @@ public class Main {
     }
 
     private static void NumberToText() {
-        long l = -999999999999999L;
+/*
+ long l = -999999999999999L;
         while (true) {
             String aux = TextToNumber.toText(l);
             System.out.println(l + " - " + aux);
             l++;
         }
+ */
     }
 
 }

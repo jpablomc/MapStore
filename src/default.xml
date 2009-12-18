@@ -18,7 +18,7 @@
         <xa>
             <factory>es.uc3m.it.mapstore.db.transaction.xa.impl.DerbyResourceManagerWrapper</factory>
             <type>Numerical</type>
-            <name>Derby</name>
+            <name>derby</name>
             <prop>
                 <dialect>es.uc3m.it.mapstore.db.dialect.DerbyDialect</dialect>
             </prop>
@@ -26,14 +26,14 @@
         <xa>
             <factory>es.uc3m.it.mapstore.db.transaction.xa.impl.lucene.LuceneResourceManagerWrapper</factory>
             <type>FullText</type>
-            <name>Lucene</name>
+            <name>lucene</name>
             <prop></prop>
         </xa>
 
         <xa>
             <factory>es.uc3m.it.mapstore.db.transaction.xa.impl.neo.NeoResourceManagerWrapper</factory>
             <type>Relationship</type>
-            <name>Neo</name>
+            <name>neo</name>
             <prop></prop>
         </xa>
         <persistance>

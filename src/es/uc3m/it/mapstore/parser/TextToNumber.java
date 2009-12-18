@@ -22,13 +22,13 @@ public class TextToNumber {
     private static final String[] SEPARATOR = {"thousand","million","billion","trillion"};
     private static final String[] SPECIAL = {"eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen"};
 
-    private static List<String> special_tens;
+//    private static List<String> special_tens;
 
-    static {
-        special_tens = Arrays.asList(UNIDADES);
-        special_tens.addAll(Arrays.asList(DECENA));
-        special_tens.addAll(Arrays.asList(SPECIAL));
-    }
+//    static {
+//        special_tens = Arrays.asList(UNIDADES);
+//        special_tens.addAll(Arrays.asList(DECENA));
+//        special_tens.addAll(Arrays.asList(SPECIAL));
+//    }
 
 /*
     private void toNumber(String text) {
@@ -77,8 +77,8 @@ public class TextToNumber {
         List<String> 
     }
 */
-
-    public static String toText(long number) {
+/*
+    public static String toText(double number) {
         List<String> auxStr = new ArrayList<String>();
         StringBuffer sb = new StringBuffer();
         //Tratar el signo
@@ -123,6 +123,11 @@ public class TextToNumber {
             if (number > 0) sb.append(" ").append(UNIDADES[number - 1]);
         }
         return sb;
+    }
+*/
+    public static Double toNumber(String predicate) throws NumberFormatException {
+        //TODO:To implement
+        throw new NumberFormatException("Not implemented yet");
     }
 
 }

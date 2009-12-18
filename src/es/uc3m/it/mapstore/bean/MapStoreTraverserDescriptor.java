@@ -7,7 +7,6 @@ package es.uc3m.it.mapstore.bean;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -54,7 +53,7 @@ public class MapStoreTraverserDescriptor {
 
     /**
      *
-     * This method will construct a traverser that followa always the given
+     * This method will construct a traverser that follows always the given
      * property, for up to the specified distance.
      * The admited direction will be outgoing. The default search algorithm
      * search will be used
@@ -63,8 +62,7 @@ public class MapStoreTraverserDescriptor {
      * @param distance The maximum distance that can be trasversed. If NULL the
      * distance is limitless.
      */
-    public MapStoreTraverserDescriptor(Set<Integer> nodes,String property, Integer distance) {
-        initialNodes = nodes;
+    public MapStoreTraverserDescriptor(String property, Integer distance) {
         route = new ArrayList<String>();
         directions = new ArrayList<Integer>();
         route.add(property);
@@ -86,8 +84,7 @@ public class MapStoreTraverserDescriptor {
      * @param distance The maximum distance that can be trasversed. If NULL the
      * distance is limitless.
      */
-    public MapStoreTraverserDescriptor(Set<Integer> nodes, List<String> property, Integer distance) {
-        initialNodes = nodes;
+    public MapStoreTraverserDescriptor(List<String> property, Integer distance) {
         route = new ArrayList<String>(property);
         directions = new ArrayList<Integer>();
         while (directions.size()< route.size()) directions.add(DIRECTION_FROM_FIRST_TO_SECOND);
@@ -109,8 +106,7 @@ public class MapStoreTraverserDescriptor {
      * @param directions The direction of the relationship
      * @param distance The maximum search distance
      */
-    public MapStoreTraverserDescriptor(Set<Integer> nodes,List<String> property, List<Integer> directions, Integer distance) {
-        initialNodes = nodes;
+    public MapStoreTraverserDescriptor(List<String> property, List<Integer> directions, Integer distance) {
         route = new ArrayList<String>(property);
         directions = new ArrayList<Integer>(directions);
         if (directions.size() != route.size()) throw new IllegalArgumentException("The route and direction list must have the same length");
@@ -132,8 +128,7 @@ public class MapStoreTraverserDescriptor {
      * @param distanceMin The minimum search distance. Can not be null
      * @param distanceMax The maximum search distance
      */
-    public MapStoreTraverserDescriptor(Set<Integer> nodes,List<String> property, List<Integer> directions, Integer distanceMin, Integer distanceMax) {
-        initialNodes = nodes;
+    public MapStoreTraverserDescriptor(List<String> property, List<Integer> directions, Integer distanceMin, Integer distanceMax) {
         if (distanceMin == null) throw new IllegalArgumentException("The minimum distance can not be null");
         else this.distanceMin = distanceMin;
         route = new ArrayList<String>(property);
@@ -156,8 +151,7 @@ public class MapStoreTraverserDescriptor {
      * @param distanceMax The maximum search distance
      * @param search The search algorithm to use
      */
-    public MapStoreTraverserDescriptor(Set<Integer> nodes,List<String> property, List<Integer> directions, Integer distanceMin, Integer distanceMax, int search) {
-        initialNodes = nodes;
+    public MapStoreTraverserDescriptor(List<String> property, List<Integer> directions, Integer distanceMin, Integer distanceMax, int search) {
         if (distanceMin == null) throw new IllegalArgumentException("The minimum distance can not be null");
         else this.distanceMin = distanceMin;
         route = new ArrayList<String>(property);
@@ -198,5 +192,8 @@ public class MapStoreTraverserDescriptor {
         return initialNodes;
     }
 
+    public void setInitialNodes(Set<Integer> nodes) {
+        initialNodes = nodes;
+    }
 
 }

@@ -5,7 +5,7 @@
 
 package es.uc3m.it.mapstore.db.transaction.xa.impl.neo;
 
-import es.uc3m.it.mapstore.bean.MapStoreCondition;
+import es.uc3m.it.mapstore.bean.MapStoreBasicCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
 import es.uc3m.it.mapstore.bean.MapStoreResult;
 import es.uc3m.it.mapstore.bean.MapStoreTraverserDescriptor;
@@ -116,30 +116,39 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
     }
 
     @Override
-    public Map<Integer,MapStoreResult> findByConditions(List<MapStoreCondition> cond, int flag, Date fecha) {
-        Map<Integer,MapStoreResult> items = null;
-        for (MapStoreCondition c : cond) {
-            if (c.getOperator() != MapStoreCondition.OP_RELATED) throw new IllegalArgumentException("Unsupported operator. Neo can only resolve relations");
+    public MapStoreResult findByConditions(List<MapStoreBasicCondition> cond, int flag, Date fecha) {
+        MapStoreResult items = null;
+        for (MapStoreBasicCondition c : cond) {
+            if (c.getOperator() != MapStoreBasicCondition.OP_RELATED) throw new IllegalArgumentException("Unsupported operator. Neo can only resolve relations");
             if (!(c.getValue() instanceof MapStoreTraverserDescriptor)) throw new IllegalArgumentException("Unsupported value. Value must be a MapStoreTraverserDescriptor instance");
             MapStoreTraverserDescriptor traverser = (MapStoreTraverserDescriptor) c.getValue();
-
+            MapStoreResult aux = findByCondition(traverser, fecha);
+            if (items == null) items = aux;
+            else {
+                switch (flag) {
+                    case MapStoreSession.CONJUNCTIVE_SEARCH:
+                        items.and(aux);
+                        break;
+                    case MapStoreSession.DISJUNCTIVE_SEARCH:
+                        items.or(aux);
+                        break;
+                }
+            }
         }
         return items;
     }
 
-    private Map<Integer,MapStoreResult> findByCondition(MapStoreTraverserDescriptor traverser, Date fecha) {
+    private MapStoreResult findByCondition(MapStoreTraverserDescriptor traverser, Date fecha) {
         PersistenceManager manager = getPersistanceManager();
-        Map<Integer,MapStoreResult> items = null;
-        Map<Integer,MapStoreResult> validVersions = null;
+        MapStoreResult items = new MapStoreResult();
+        MapStoreResult validVersions = new MapStoreResult();
         for (Integer initialNode : traverser.getInitialNodes()) {
             //Inicialización
             NeoResultsManager results = new NeoResultsManager(traverser.getSearchAlgorithm());
             results.add(initialNode, 0);
-            if (!validVersions.containsKey(initialNode)) {
+            if (validVersions.getVersionsForId(initialNode) == null) {
                 int version = getValidVersionForNode(initialNode, fecha);
-                MapStoreResult msr = new MapStoreResult(initialNode);
-                msr.addVersion(version);
-                validVersions.put(initialNode, msr);
+                validVersions.addIdVersion(initialNode, version);
             }
             //Procesado
             Integer next = results.getNext();
@@ -147,7 +156,7 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
             while (next != null) {
                 int depth = results.getDepth(next);
                 if (depth >= traverser.getDistanceMin() && depth <= traverser.getDistanceMax()) {
-                    items.put(next,validVersions.get(next));
+                    items.addIdVersion(next,validVersions.getVersionsForId(next));
                 }
                 if (depth < traverser.getDistanceMax()) {
                     String relation = traverser.getRouteForDistance(depth+1);
@@ -155,11 +164,9 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
                     for (RelationshipData rd : manager.loadRelationships(depth)) {
                         Integer newNode = mustBeTraversed(next, rd, relation, direction, fecha);
                         if (newNode != null) {
-                            if (!validVersions.containsKey(newNode)) {
+                            if (validVersions.getVersionsForId(newNode) == null) {
                                 int version = getValidVersionForNode(initialNode, fecha);
-                                MapStoreResult msr = new MapStoreResult(initialNode);
-                                msr.addVersion(version);
-                                validVersions.put(initialNode, msr);
+                                validVersions.addIdVersion(initialNode, version);
                             }
                             int newDepth = depth+1;
                             switch(rd.relationshipType()) {
@@ -403,7 +410,8 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
 
     @Override
     public void shutdown() {
-        //Empty
+        pm.stop();
+        pm = null;
     }
 
     @Override

@@ -4,6 +4,7 @@
  */
 package es.uc3m.it.mapstore.db.dialect;
 
+import es.uc3m.it.mapstore.bean.MapStoreBasicCondition;
 import es.uc3m.it.mapstore.db.MapStoreDialect;
 import java.io.Serializable;
 import java.text.ParseException;
@@ -11,7 +12,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-import es.uc3m.it.mapstore.bean.MapStoreCondition;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
@@ -74,7 +74,7 @@ public abstract class SQLDialect implements MapStoreDialect {
         return aux;
     }
 
-    public String getQueryForCondition(MapStoreCondition cond) {
+    public String getQueryForCondition(MapStoreBasicCondition cond) {
         Object value = cond.getValue();
         String sql;
         if (value instanceof List) {
@@ -332,7 +332,7 @@ public abstract class SQLDialect implements MapStoreDialect {
         return sb.toString();
     }
 
-    private String processOperator(MapStoreCondition cond) {
+    private String processOperator(MapStoreBasicCondition cond) {
         Object o = cond.getValue();
         String sql = cond.getProperty() + " ";
         if (o instanceof Number) {
@@ -347,13 +347,13 @@ public abstract class SQLDialect implements MapStoreDialect {
         return sql;
     }
 
-    private String processOperatorList(MapStoreCondition cond) {
+    private String processOperatorList(MapStoreBasicCondition cond) {
         String sql = null;
         switch (cond.getOperator()) {
-            case MapStoreCondition.OP_BETWEEN:
+            case MapStoreBasicCondition.OP_BETWEEN:
                 sql = processOperatorBetween(cond);
                 break;
-            case MapStoreCondition.OP_IN:
+            case MapStoreBasicCondition.OP_IN:
                 sql = processOperatorIn(cond);
                 break;
             default:
@@ -362,7 +362,7 @@ public abstract class SQLDialect implements MapStoreDialect {
         return sql;
     }
 
-    private String processOperatorBetween(MapStoreCondition cond) {
+    private String processOperatorBetween(MapStoreBasicCondition cond) {
         Object o = cond.getValue();
         String sql = null;
         if (!(o instanceof List)) {
@@ -396,7 +396,7 @@ public abstract class SQLDialect implements MapStoreDialect {
         return sql;
     }
 
-    private String processOperatorIn(MapStoreCondition cond) {
+    private String processOperatorIn(MapStoreBasicCondition cond) {
         Object o = cond.getValue();
         if (!(o instanceof List)) {
             throw new IllegalArgumentException("Type is not supported. IN requieres that a List object is provided.");
@@ -430,7 +430,7 @@ public abstract class SQLDialect implements MapStoreDialect {
         return sb.toString();
     }
 
-    private String processOperatorNumber(MapStoreCondition cond) {
+    private String processOperatorNumber(MapStoreBasicCondition cond) {
         String sql = "PROPERTY = '" + cond.getProperty() + "' AND VALUE ";
         Object o = cond.getValue();
         if (!(o instanceof Number)) {
@@ -438,22 +438,22 @@ public abstract class SQLDialect implements MapStoreDialect {
         }
         Number n = (Number) o;
         switch (cond.getOperator()) {
-            case MapStoreCondition.OP_BIGGEROREQUALSTHAN:
+            case MapStoreBasicCondition.OP_BIGGEROREQUALSTHAN:
                 sql += ">= " + convertNumber(n);
                 break;
-            case MapStoreCondition.OP_BIGGERTHAN:
+            case MapStoreBasicCondition.OP_BIGGERTHAN:
                 sql += "> " + convertNumber(n);
                 break;
-            case MapStoreCondition.OP_EQUALS:
+            case MapStoreBasicCondition.OP_EQUALS:
                 sql += "= " + convertNumber(n);
                 break;
-            case MapStoreCondition.OP_LESSOREQUALSTHAN:
+            case MapStoreBasicCondition.OP_LESSOREQUALSTHAN:
                 sql += "<= " + convertNumber(n);
                 break;
-            case MapStoreCondition.OP_LESSTHAN:
+            case MapStoreBasicCondition.OP_LESSTHAN:
                 sql += "< " + convertNumber(n);
                 break;
-            case MapStoreCondition.OP_NOTEQUALS:
+            case MapStoreBasicCondition.OP_NOTEQUALS:
                 sql += "<> " + convertNumber(n);
                 break;
             default:
@@ -462,7 +462,7 @@ public abstract class SQLDialect implements MapStoreDialect {
         return sql;
     }
 
-    private String processOperatorDate(MapStoreCondition cond) {
+    private String processOperatorDate(MapStoreBasicCondition cond) {
         String sql = "PROPERTY = '" + cond.getProperty() + "' AND VALUE ";
         Object o = cond.getValue();
         if (!(o instanceof Date)) {
@@ -483,11 +483,11 @@ public abstract class SQLDialect implements MapStoreDialect {
             Logger.getLogger(SQLDialect.class.getName()).log(Level.SEVERE, null, ex);
         }
         switch (cond.getOperator()) {
-            case MapStoreCondition.OP_BIGGEROREQUALSTHAN:
+            case MapStoreBasicCondition.OP_BIGGEROREQUALSTHAN:
                 //En ambos casos es busqueda a partir de la fecha dada
                 sql += ">= " + convertDate(d);
                 break;
-            case MapStoreCondition.OP_BIGGERTHAN:
+            case MapStoreBasicCondition.OP_BIGGERTHAN:
                 //En este caso si es por fecha solo hay que buscar a partir del dis siguiente incluido
                 if (porFechaSolo) {
                     Calendar cal = new GregorianCalendar();
@@ -498,7 +498,7 @@ public abstract class SQLDialect implements MapStoreDialect {
                     sql += "> " + convertDate(d);
                 }
                 break;
-            case MapStoreCondition.OP_EQUALS:
+            case MapStoreBasicCondition.OP_EQUALS:
                 //En este caso si es por fecha solo hay que buscar en todo el día.
                 if (porFechaSolo) {
                     Calendar cal = new GregorianCalendar();
@@ -510,7 +510,7 @@ public abstract class SQLDialect implements MapStoreDialect {
                     sql += "= '" + convertDate(d) + "'";
                 }
                 break;
-            case MapStoreCondition.OP_LESSOREQUALSTHAN:
+            case MapStoreBasicCondition.OP_LESSOREQUALSTHAN:
                 //En este caso si es por fecha solo hay que buscar hasta el dia siguiente no incluido
                 if (porFechaSolo) {
                     Calendar cal = new GregorianCalendar();
@@ -521,11 +521,11 @@ public abstract class SQLDialect implements MapStoreDialect {
                     sql += "<= " + convertDate(d);
                 }
                 break;
-            case MapStoreCondition.OP_LESSTHAN:
+            case MapStoreBasicCondition.OP_LESSTHAN:
                 //En ambos casos es busqueda hasta la fecha dada
                 sql += ">= " + convertDate(d);
                 break;
-            case MapStoreCondition.OP_NOTEQUALS:
+            case MapStoreBasicCondition.OP_NOTEQUALS:
                 //En este caso si es por fecha solo hay que buscar en todo el día.
                 if (porFechaSolo) {
                     Calendar cal = new GregorianCalendar();

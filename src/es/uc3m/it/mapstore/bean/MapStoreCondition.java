@@ -5,11 +5,13 @@
 
 package es.uc3m.it.mapstore.bean;
 
+import java.util.Set;
+
 /**
  *
  * @author Pablo
  */
-public class MapStoreCondition {
+public interface MapStoreCondition {
     public static final int OP_EQUALS = 0;
     public static final int OP_SIMILARITY = 1;
     public static final int OP_BIGGERTHAN = 2;
@@ -22,44 +24,10 @@ public class MapStoreCondition {
     public static final int OP_RELATED = 9;
     public static final int OP_PHRASE = 10;
 
+    public boolean hasDependencies();
+    public Set<MapStoreCondition> getRequieredConditions();
+    public void setResultsForCondition(MapStoreCondition cond, MapStoreResult r);
 
-    public String property;
-    public Object value;
-    public int operator;
-
-    public MapStoreCondition(String property, Object value,int operator) {
-        this.property = property;
-        this.value = value;
-        this.operator = operator;
-    }
-
-    public String getProperty() {
-        return property;
-    }
-
-    public void setProperty(String property) {
-        this.property = property;
-    }
-
-    public Object getValue() {
-        return value;
-    }
-
-    public void setValue(Object value) {
-        this.value = value;
-    }
-
-    public Class getType() {
-        return value.getClass();
-    }
-
-    public int getOperator() {
-        return operator;
-    }
-
-    public void setOperator(int operator) {
-        this.operator = operator;
-    }
-
+    public void debugPrint(int depth);
     
 }

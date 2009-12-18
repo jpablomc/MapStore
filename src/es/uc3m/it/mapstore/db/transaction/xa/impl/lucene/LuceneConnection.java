@@ -4,7 +4,7 @@
  */
 package es.uc3m.it.mapstore.db.transaction.xa.impl.lucene;
 
-import es.uc3m.it.mapstore.bean.MapStoreCondition;
+import es.uc3m.it.mapstore.bean.MapStoreBasicCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
 import es.uc3m.it.mapstore.bean.MapStoreResult;
 import es.uc3m.it.mapstore.db.transaction.xa.impl.AbstractConnection;
@@ -209,7 +209,7 @@ public class LuceneConnection extends AbstractConnection {
     public final static int CONJUNCTIVE_SEARCH = 0;
     public final static int DISJUNCTIVE_SEARCH = 1;
 
-    public Map<Integer, MapStoreResult> findByConditions(List<MapStoreCondition> cond, int flag, Date fecha) throws SQLException {
+    public MapStoreResult findByConditions(List<MapStoreBasicCondition> cond, int flag, Date fecha) throws SQLException {
         BooleanQuery q = new BooleanQuery();
         BooleanClause.Occur bc = null;
         switch (flag) {
@@ -220,21 +220,21 @@ public class LuceneConnection extends AbstractConnection {
                 bc = BooleanClause.Occur.SHOULD;
                 break;
         }
-        for (MapStoreCondition c : cond) {
+        for (MapStoreBasicCondition c : cond) {
             Query qAux = null;
             switch (c.getOperator()) {
-                case MapStoreCondition.OP_EQUALS:
+                case MapStoreBasicCondition.OP_EQUALS:
                     Term t = new Term(c.getProperty(), c.getValue().toString());
                     qAux = new TermQuery(t);
                     break;
-                case MapStoreCondition.OP_NOTEQUALS:
+                case MapStoreBasicCondition.OP_NOTEQUALS:
                     t = new Term(c.getProperty(), c.getValue().toString());
                     qAux = new TermQuery(t);
                     BooleanQuery baux = new BooleanQuery();
                     baux.add(qAux, BooleanClause.Occur.MUST_NOT);
                     qAux = baux;
                     break;
-                case MapStoreCondition.OP_PHRASE:
+                case MapStoreBasicCondition.OP_PHRASE:
                     PhraseQuery pq = new PhraseQuery();
                     String auxStr = c.getValue().toString();
                     String[] terms = auxStr.split(" ");
@@ -244,7 +244,7 @@ public class LuceneConnection extends AbstractConnection {
                     }
                     qAux = pq;
                     break;
-                case MapStoreCondition.OP_SIMILARITY:
+                case MapStoreBasicCondition.OP_SIMILARITY:
                     t = new Term(c.getProperty(), c.getValue().toString());
                     qAux = new FuzzyQuery(t);
                     break;
@@ -263,7 +263,7 @@ public class LuceneConnection extends AbstractConnection {
         try {
             is = new IndexSearcher(path);
             int maxDocs = is.maxDoc();
-            Map<Integer, MapStoreResult> results = new HashMap<Integer, MapStoreResult>();
+            MapStoreResult results = new MapStoreResult();
             if (maxDocs > 0) {
                 TopDocs td = is.search(q, maxDocs);
                 ScoreDoc[] sd = td.scoreDocs;
@@ -272,12 +272,7 @@ public class LuceneConnection extends AbstractConnection {
                     Document d = r.document(sd[0].doc);
                     Integer id = new Integer(d.getFieldable(MapStoreItem.ID).stringValue());
                     Integer ver = new Integer(d.getFieldable(MapStoreItem.VERSION).stringValue());
-                    MapStoreResult res = results.get(id);
-                    if (res == null) {
-                        res = new MapStoreResult(id);
-                        results.put(id, res);
-                    }
-                    res.addVersion(ver);
+                    results.addIdVersion(i, ver);
                 }
             }
             return results;
