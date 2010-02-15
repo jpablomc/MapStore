@@ -22,6 +22,7 @@ public class StringPropertyTransformer implements MapStoreTransformer<String>{
         //cadena previa
         item.setName(object);
         item.setType(String.class.getName());
+        item.setDataClass(String.class.getName());
         item.setProperty(STRING_VALUE,object);
         return item;
     }

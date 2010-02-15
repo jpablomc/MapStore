@@ -44,21 +44,22 @@ public class QueryParserTest {
     public void testQueryToConditions() {
         System.out.println("queryToConditions");
         String[] queries = new String[]{
-//            "propiedad = valor",
-//            "propiedad = 12",
-//            "propiedad = 12.2553",
-//            "propiedad = \"frase\"",
-//            "propiedad = \"Esto es una frase\"",
-//            "propiedad = [1,2]",
-//            "propiedad = [1 ,2]",
-//            "propiedad = [abc ,cde]",
-//            "propiedad = [11 ,22]",
-//            "propiedad = [\"add asd\" ,\"eee s\"]",
-//            "prp1 <= 01/01/2007 prp2 > bbb AND prp4 != vvv OR prp6 != ddd OR pro7 ~ eee",
-//            "prp1 <= 01/01/2007 AND prp2 > bbb AND prp4 != vvv OR prp6 != ddd AND pro7 ~ eee",
-//            "(prp1= pepito) -> {ANY, 1}",
-//            "(_TYPE =  es.uc3m.it.mapstore.web.beans.DataType AND _NAME = GeoPoint) -> {[DATATYPE,a] ,3}", // AND _TYPE = es.uc3m.it.mapstore.web.beans.DataObject"
-            "(_TYPE =  es.uc3m.it.mapstore.web.beans.DataType AND _NAME = GeoPoint) -> {[DATATYPE,a] ,[<--] ,3}" // AND _TYPE = es.uc3m.it.mapstore.web.beans.DataObject"
+            //"propiedad = valor",
+            //"propiedad = 12",
+            //"propiedad = 12.2553",
+            //"propiedad = \"frase\"",
+            //"propiedad = \"Esto es una frase\"",
+            //"propiedad = [1,2]",
+            //"propiedad = [1 ,2]",
+            //"propiedad = [abc ,cde]",
+            //"propiedad = [11 ,22]",
+            //"propiedad = [\"add asd\" ,\"eee s\"]",
+            //"prp1 <= 01/01/2007 prp2 > bbb AND prp4 != vvv OR prp6 != ddd OR pro7 ~ eee",
+            //"prp1 <= 01/01/2007 AND prp2 > bbb AND prp4 != vvv OR prp6 != ddd AND pro7 ~ eee",
+            //"(prp1= pepito) -> {ANY, 1}",
+            //"(_TYPE =  es.uc3m.it.mapstore.web.beans.DataType AND _NAME = GeoPoint) -> {DATATYPE ,3}",
+            "(_TYPE =  es.uc3m.it.mapstore.web.beans.DataType AND _NAME = GeoPoint) -> {[DATATYPE,a] ,3}", // AND _TYPE = es.uc3m.it.mapstore.web.beans.DataObject"
+            //"(_TYPE =  es.uc3m.it.mapstore.web.beans.DataType AND _NAME = GeoPoint) -> {[DATATYPE,HOLA] ,[<--,<->] ,3} AND _TYPE = es.uc3m.it.mapstore.web.beans.DataObject"
         };
         for (String query: queries) {
             System.out.println(query);

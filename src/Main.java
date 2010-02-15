@@ -3,8 +3,8 @@ import es.uc3m.it.mapstore.bean.MapStoreBasicCondition;
 import es.uc3m.it.mapstore.bean.MapStoreItem;
 import es.uc3m.it.mapstore.bean.MapStoreListCondition;
 import es.uc3m.it.mapstore.bean.annotations.Name;
+import es.uc3m.it.mapstore.bean.annotations.Type;
 import es.uc3m.it.mapstore.db.impl.MapStoreSession;
-import es.uc3m.it.mapstore.parser.TextToNumber;
 import es.uc3m.it.mapstore.transformers.exception.UnTransformableException;
 import java.io.IOException;
 import java.sql.SQLException;
@@ -28,7 +28,7 @@ public class Main {
         private int prop2;
         private Main relatedTo;
         @Name(order = 0)
-        private String name;
+        private String name;        
         private String texto;
         private List<Integer> numeros;
         private List<String> caracteres;

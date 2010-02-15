@@ -17,17 +17,19 @@ public class MapStoreExtendedItem<T extends Object> {
     private String name;
     private Integer id;
     private Integer version;
+    private String type;
     private Date recordDate;
     private Boolean deleted;
     private T value;
 
-    public MapStoreExtendedItem(String name, Integer id, Integer version, Date recordDate, Boolean deleted, T value) {
+    public MapStoreExtendedItem(String name, Integer id, Integer version, Date recordDate, Boolean deleted, T value,String type) {
         this.name = name;
         this.id = id;
         this.version = version;
         this.recordDate = recordDate;
         this.deleted = deleted;
         this.value = value;
+        this.type = type;
     }
 
     public Boolean getDeleted() {
@@ -52,6 +54,14 @@ public class MapStoreExtendedItem<T extends Object> {
 
     public Integer getVersion() {
         return version;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 
 

@@ -36,6 +36,7 @@ public class ArrayTransformer implements MapStoreTransformer<Object[]>{
             i++;
         }
         item.setType(collection.getClass().getComponentType().getName());
+        item.setDataClass(collection.getClass().getComponentType().getName());
         item.setProperty(GENERIC_STRING, ReflectionUtils.determineGenericType(Arrays.asList(collection)).getName());
         item.setExtra(MapStoreItem.ISARRAY);
         item.setPrefix(PROP_STRING);
@@ -45,7 +46,7 @@ public class ArrayTransformer implements MapStoreTransformer<Object[]>{
     @Override
     public Object[] toObject(MapStoreItem item) {
         try {
-            String clazzName = item.getType();
+            String clazzName = item.getDataClass();
             //Object[] col = (Object[]) Class.forName(clazzName).newInstance();
             List<Object> aux = new ArrayList<Object>();
             List<String> propertiesToProcess = getPropertiesToProcess(item);

@@ -20,6 +20,7 @@ public class MapStoreItem implements Serializable{
     public final static String NAME = "_NAME";
     public final static String ID = "_ID";
     public final static String TYPE = "_TYPE";
+    public final static String CLASS = "_CLASS";
     public final static String VERSION = "_VERSION";
     public final static String RECORDDATE = "_RECORDDATE";
     public final static String DELETED = "_DELETED";
@@ -145,6 +146,25 @@ public class MapStoreItem implements Serializable{
     }
 
     /**
+     * Devuelve la clase de objeto representado
+     *
+     * @return
+     */
+    public String getDataClass() {
+        return (String)properties.get(CLASS);
+    }
+    /**
+     * Establece la clase de objeto representado
+     *
+     * @param value Nuevo valor del tipo de objeto
+     */
+    public void setDataClass(String value) {
+        //TODO: Loguear el cambio cuando se modifique el valor... posiblemente
+        //pueda llevar a problemas al ejecutar un update
+        properties.put(CLASS, value);
+    }
+
+    /**
      * Devuelve si el objeto representa a un objeto eliminado
      *
      * @return
@@ -225,6 +245,7 @@ public class MapStoreItem implements Serializable{
         if (NAME.equals(propertyName)) setName((String)value);
         else if (ID.equals(propertyName)) setId((Integer) value);
         else if (TYPE.equals(propertyName)) setType((String)value);
+        else if (CLASS.equals(propertyName)) setDataClass((String)value);
         else properties.put(propertyName, value);
     }
 

@@ -239,7 +239,6 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
      */
     private boolean needsUpdateCollection(Collection newObject, Collection oldObject) {
         boolean needsUpdate = false;
-        ;
         //Los objetos son colecciones
         Collection c1 = newObject;
         Collection c2 = oldObject;
@@ -405,7 +404,9 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
             throw new MapStoreRunTimeException(ex);
         }
     }
-    private final static String[] NONDELETABLEPROPERTIES = {MapStoreItem.ID, MapStoreItem.NAME, MapStoreItem.RECORDDATE, MapStoreItem.TYPE, MapStoreItem.VERSION};
+    private final static String[] NONDELETABLEPROPERTIES = {MapStoreItem.ID,
+        MapStoreItem.NAME, MapStoreItem.RECORDDATE, MapStoreItem.TYPE,
+        MapStoreItem.VERSION, MapStoreItem.CLASS};
 
     public void delete(Object obj) {
         try {
@@ -438,6 +439,7 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
                     item.setProperty(aux, null);
                 }
             }
+            item.setDeleted(true);
             Collection<ResourceManagerWrapper> resources = MapStoreConfig.getInstance().getXAResourceLookup();
             PersistenceManagerWrapper pm = MapStoreConfig.getInstance().getPersistenceResourceLookup();
             Transaction t = tm.getTransactionManager().getTransaction();
@@ -553,9 +555,10 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         return toReturn;
     }
 
-    public <T> T findByNameType(String name, Class<T> c) {
+    public <T> T findByNameType(String name, String type, Class<T> c) {
         try {
-            MapStoreItem item = findByNameType(name, c.getName());
+            if (type == null) type = c.getName();
+            MapStoreItem item = findByNameType(name, type);
             T toReturn = null;
             if (item != null) {
                 MapStoreTransformer<T> trans = MapStoreConfig.getInstance().getTransformerFactory().getFactory(c);
@@ -568,14 +571,15 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         }
     }
 
-    public <T> List<T> findByType(Class<T> c) {
+    public <T> List<T> findByType(Class<T> c, String type) {
         try {
-            List<MapStoreItem> items = findByType(c.getName());
+            if (type == null) type = c.getName();
+            List<MapStoreItem> items = findByType(type);
             List<T> toReturn = new ArrayList<T>();
             if (items != null && !items.isEmpty()) {
                 MapStoreTransformer<T> trans = MapStoreConfig.getInstance().getTransformerFactory().getFactory(c);
                 for (MapStoreItem i : items) {
-                    toReturn.add(trans.toObject(i));
+                    if (!i.isDeleted()) toReturn.add(trans.toObject(i));
                 }
             }
             return toReturn;
@@ -597,7 +601,7 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
                 MapStoreExtendedItem<T> object = new MapStoreExtendedItem<T>(
                         item.getName(), item.getId(), item.getVersion(),
                         item.getRecordDate(), item.isDeleted(),
-                        trans.toObject(item));
+                        trans.toObject(item),item.getType());
                 results.add(object);
             } catch (UnTransformableException ex) {
                 Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);
@@ -722,7 +726,7 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
             MapStoreExtendedItem<T> object = new MapStoreExtendedItem<T>(
                                 item.getName(), item.getId(), item.getVersion(),
                                 item.getRecordDate(), item.isDeleted(),
-                                value);
+                                value,item.getType());
             return object;
         } catch (UnTransformableException ex) {
             throw new MapStoreRunTimeException(ex);
@@ -738,6 +742,19 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         } catch (UnTransformableException ex) {
             throw new MapStoreRunTimeException(ex);
         }
+    }
+
+    public MapStoreItem recoverRawById(int id) {
+        return recoverById(id);
+    }
+
+    public MapStoreItem recoverRawByIdVersion(int id, int version) {
+        Map<Integer, Set<Integer>> mapa = new HashMap<Integer, Set<Integer>>();
+        Set<Integer> set = new HashSet<Integer>();
+        set.add(version);
+        mapa.put(id, set);
+        Map<Integer, Map<Integer, MapStoreItem>> result = recoverByIdVersion(mapa);
+        return result.get(id).get(version);
     }
 
     public <T> T recoverByIdVersion(int id, int version, Class<T> clazz) {
@@ -787,7 +804,8 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
         if (newItem.getName() != null) {
             name = newItem.getName();
         }
-        Object oldObject = findByNameType(name, newObject.getClass());
+        String type = newItem.getType();
+        Object oldObject = findByNameType(name, type, newObject.getClass());
         //Procesamos el objeto según el tipo.... (Lista,Array, Coleccion, Mapa, Tipo Complejo
         //Se distinguen las listas de las colecciones ya que estas deben respetar el orden
         //No hay tipos basicos ya que estos se actualizan siempre

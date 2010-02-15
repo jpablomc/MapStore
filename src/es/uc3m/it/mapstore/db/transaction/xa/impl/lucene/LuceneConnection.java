@@ -69,19 +69,24 @@ public class LuceneConnection extends AbstractConnection {
 
     @Override
     public void commit() throws SQLException {
-        if (!prepared) {
-            prepare();
-        }
         try {
-            w.commit();
-            w.close();
+            if (!prepared) {
+                prepare();
+            }
+            w.commit();            
         } catch (CorruptIndexException ex) {
-            Logger.getLogger(LuceneConnection.class.getName()).log(Level.SEVERE, null, ex);
             throw new SQLException(ex);
-        } catch (IOException ex) {
-            Logger.getLogger(LuceneConnection.class.getName()).log(Level.SEVERE, null, ex);
+       } catch (IOException ex) {
             throw new SQLException(ex);
-        }
+       } finally {
+            try {
+                if (w != null) w.close();
+            } catch (CorruptIndexException ex) {
+                throw new SQLException(ex);
+            } catch (IOException ex) {
+                throw new SQLException(ex);
+            }
+       }
     }
 
     public void indexNew(long id, long version, String property, Object value) throws SQLException {
@@ -104,6 +109,7 @@ public class LuceneConnection extends AbstractConnection {
 
     public int prepare() throws SQLException {
         try {
+            Logger.getLogger(LuceneConnection.class.getName()).log(Level.INFO, "Abierto el escritor de lucene");
             w = new IndexWriter(path, analyzer, IndexWriter.MaxFieldLength.UNLIMITED);
             for (Long id : dataDelete) {
                 Term t = new Term(MapStoreItem.ID, id.toString());
@@ -185,15 +191,20 @@ public class LuceneConnection extends AbstractConnection {
         }
         //Comprobar que no sea el id...
         if (!MapStoreItem.ID.equals(property)) {
-            if (value instanceof Collection) {
-                Collection col = (Collection) value;
-                for (Object obj : col) {
-                    Field f = new Field(property, value.toString(), Field.Store.NO, Field.Index.ANALYZED);
-                    d.add(f);
+            if (MapStoreItem.NAME.equals(property) || MapStoreItem.TYPE.equals(property) || MapStoreItem.CLASS.equals(property)) {
+                    Field f = new Field(property, value.toString(), Field.Store.NO, Field.Index.NOT_ANALYZED);
+                    d.add(f);                
+            } else{
+                if (value instanceof Collection) {
+                    Collection col = (Collection) value;
+                    for (Object obj : col) {
+                        Field f = new Field(property, value.toString(), Field.Store.NO, Field.Index.ANALYZED);
+                        d.add(f);
+                    }
+                } else {
+                        Field f = new Field(property, value.toString(), Field.Store.NO, Field.Index.ANALYZED);
+                        d.add(f);
                 }
-            } else {
-                Field f = new Field(property, value.toString(), Field.Store.NO, Field.Index.ANALYZED);
-                d.add(f);
             }
         }
     }
@@ -210,6 +221,7 @@ public class LuceneConnection extends AbstractConnection {
     public final static int DISJUNCTIVE_SEARCH = 1;
 
     public MapStoreResult findByConditions(List<MapStoreBasicCondition> cond, int flag, Date fecha) throws SQLException {
+        if (cond.size() == 1) return findByConditions(cond.get(0),fecha);
         BooleanQuery q = new BooleanQuery();
         BooleanClause.Occur bc = null;
         switch (flag) {
@@ -293,5 +305,79 @@ public class LuceneConnection extends AbstractConnection {
                 }
             }
 
+    }
+
+    private MapStoreResult findByConditions(MapStoreBasicCondition c, Date fecha) throws SQLException {
+        BooleanClause.Occur bc = BooleanClause.Occur.MUST;
+        Query qAux = null;
+        switch (c.getOperator()) {
+            case MapStoreBasicCondition.OP_EQUALS:
+                Term t = new Term(c.getProperty(), c.getValue().toString());
+                qAux = new TermQuery(t);
+                break;
+            case MapStoreBasicCondition.OP_NOTEQUALS:
+                t = new Term(c.getProperty(), c.getValue().toString());
+                qAux = new TermQuery(t);
+                BooleanQuery baux = new BooleanQuery();
+                baux.add(qAux, BooleanClause.Occur.MUST_NOT);
+                qAux = baux;
+                break;
+            case MapStoreBasicCondition.OP_PHRASE:
+                PhraseQuery pq = new PhraseQuery();
+                String auxStr = c.getValue().toString();
+                String[] terms = auxStr.split(" ");
+                for (String tStr : terms) {
+                    t = new Term(c.getProperty(), tStr);
+                    pq.add(t);
+                }
+                qAux = pq;
+                break;
+            case MapStoreBasicCondition.OP_SIMILARITY:
+                t = new Term(c.getProperty(), c.getValue().toString());
+                qAux = new FuzzyQuery(t);
+                break;
+        }
+        if (fecha != null) {
+            BooleanQuery aux = new BooleanQuery();
+            aux.add(qAux, bc);
+            Term lowerTerm = new Term(MapStoreItem.RECORDDATE, "1900-01-01 00:00:00");
+            Term upperTerm = new Term(MapStoreItem.RECORDDATE, df.format(fecha));
+            RangeQuery rq = new RangeQuery(lowerTerm, upperTerm, true);
+            aux.add(rq, BooleanClause.Occur.MUST);
+            qAux = aux;
+        }
+        IndexSearcher is = null;
+        try {
+            is = new IndexSearcher(path);
+            int maxDocs = is.maxDoc();
+            MapStoreResult results = new MapStoreResult();
+            if (maxDocs > 0) {
+                TopDocs td = is.search(qAux, maxDocs);
+                ScoreDoc[] sd = td.scoreDocs;
+                IndexReader r = is.getIndexReader();
+                for (int i = 0; i < sd.length; i++) {
+                    Document d = r.document(sd[0].doc);
+                    Integer id = new Integer(d.getFieldable(MapStoreItem.ID).stringValue());
+                    Integer ver = new Integer(d.getFieldable(MapStoreItem.VERSION).stringValue());
+                    results.addIdVersion(id.intValue(), ver.intValue());
+                }
+            }
+            return results;
+        } catch (FileNotFoundException ex) {
+            return null;
+        } catch (CorruptIndexException ex) {
+            Logger.getLogger(LuceneConnection.class.getName()).log(Level.SEVERE, null, ex);
+            throw new SQLException(ex);
+        } catch (IOException ex) {
+            Logger.getLogger(LuceneConnection.class.getName()).log(Level.SEVERE, null, ex);
+            throw new SQLException(ex);
+        } finally {
+            if (is != null) try {
+                    is.close();
+                } catch (IOException ex) {
+                    Logger.getLogger(LuceneConnection.class.getName()).log(Level.SEVERE, null, ex);
+                    throw new SQLException(ex);
+                }
+            }
     }
 }

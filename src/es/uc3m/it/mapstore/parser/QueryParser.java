@@ -77,7 +77,7 @@ public class QueryParser {
 
 
 
-    private static String PATTERN_PROPERTY = "_?[\\w\\d]+";
+    private static String PATTERN_PROPERTY = "[\\w_][\\d\\w]+";
     private static String PATTERN_ARRAY_PROPERTY = "\\[(" + PATTERN_PROPERTY + " ?, ?)+"+ PATTERN_PROPERTY +"\\]";
 
     private static String PATTERN_DIRECTION_OUTGOING = "\\-\\->";
@@ -88,9 +88,7 @@ public class QueryParser {
                                               PATTERN_DIRECTION_INCOMING +"|" +
                                               PATTERN_DIRECTION_OUTGOING;
 
-    private static String PATTERN_ARRAY_DIRECTION = "\\[" +
-                                                    //"(" + PATTERN_DIRECTION + " ?, ?)+"+
-                                                    PATTERN_DIRECTION +"\\]";
+    private static String PATTERN_ARRAY_DIRECTION = "\\[(" + PATTERN_DIRECTION + " ?, ?)+"+ PATTERN_DIRECTION +"\\]";
 
     private static String PATTERN_DEPTH_ALGORITHM = "DEPTH";
     private static String PATTERN_BREADTH_ALGORITHM = "BREADTH";
@@ -132,22 +130,22 @@ public class QueryParser {
                                                 "\\}";
 
 
-    private static String PATTERN_TRAVERSER = //PATTERN_TRAVERSER_1 +"|" +
-                                             //PATTERN_TRAVERSER_2 +"|" +
-                                             PATTERN_TRAVERSER_3// +"|" +
-                                            // PATTERN_TRAVERSER_4 +"|" +
-                                             //PATTERN_TRAVERSER_5
+    private static String PATTERN_TRAVERSER = PATTERN_TRAVERSER_1 +"|" +
+                                             PATTERN_TRAVERSER_2 +"|" +
+                                             PATTERN_TRAVERSER_3 +"|" +
+                                             PATTERN_TRAVERSER_4 +"|" +
+                                             PATTERN_TRAVERSER_5
             ;
 
 
     private static String PATTERN_VALUE =
-                                          PATTERN_TRAVERSER//+"|"+
-                                          //PATTERN_LIST+"|"+
-                                          //PATTERN_RANGE+"|"+
-                                          //PATTERN_PHRASE+"|"+
-                                          //PATTERN_DATE+"|"+
-                                          //PATTERN_NUMBER+"|"+
-                                          //PATTERN_WORD
+                                          PATTERN_TRAVERSER+"|"+
+                                          PATTERN_LIST+"|"+
+                                          PATTERN_RANGE+"|"+
+                                          PATTERN_PHRASE+"|"+
+                                          PATTERN_DATE+"|"+
+                                          PATTERN_NUMBER+"|"+
+                                          PATTERN_WORD
                                           ;
     private static String PATTERN_OP_EQUALS = "=";
     private static String PATTERN_OP_SIMILARITY = "~";    
@@ -167,7 +165,7 @@ public class QueryParser {
                                              PATTERN_OP_BETWEEN+ "|" + PATTERN_OP_RELATED;
 
     // A condition will be :
-    // C = PROP OP VALUE | (COND) OP VALUE | PROP OP (COND) | (COND) OP (COND)
+    // C = PROP OP VALUE | (COND) OP VALUE
 
     private static boolean isMMDDYYYY = false;
 
@@ -199,7 +197,8 @@ public class QueryParser {
         String operator = query2.substring(0, end);
         System.out.println("O: "+ operator);
         String query3 = query2.substring(end).trim();
-        end = getEndPattern(query3, PATTERN_VALUE);
+        if (query3.startsWith("{")) end = getEndPattern(query3, PATTERN_TRAVERSER);
+        else end = getEndPattern(query3, PATTERN_VALUE);
         String predicate = query3.substring(0, end);
         System.out.println("P: "+ predicate);
         MapStoreCondition subjectCondition = null;
@@ -277,7 +276,8 @@ public class QueryParser {
         Pattern p = Pattern.compile(pattern);
         Matcher m = p.matcher(query);
         if (!m.find()) throw new ParserException("Pattern ("+ pattern +") not found on " +query);
-        if (m.start() != 0) throw new ParserException("Pattern ("+ pattern +") not found at the beggining of the query " +query);
+        if (m.start() != 0) throw new ParserException("Pattern ("+ pattern +") not found at the beggining of the query " +query +
+                "Pattern found was : " + query.substring(m.start(), m.end()));
         return m.end();
     }
 
@@ -321,14 +321,14 @@ public class QueryParser {
     private static int getOperator(String operator) {
         int result;
         if (OP_EQUALS.equals(operator)) result = MapStoreCondition.OP_EQUALS;
-        if (OP_SIMILARITY.equals(operator)) result = MapStoreCondition.OP_SIMILARITY;
-        if (OP_BIGGERTHAN.equals(operator)) result = MapStoreCondition.OP_BIGGERTHAN;
-        if (OP_BIGGEROREQUALSTHAN.equals(operator)) result = MapStoreCondition.OP_BIGGEROREQUALSTHAN;
-        if (OP_LESSTHAN.equals(operator)) result = MapStoreCondition.OP_LESSTHAN;
-        if (OP_LESSOREQUALSTHAN.equals(operator)) result = MapStoreCondition.OP_LESSOREQUALSTHAN;
-        if (OP_NOTEQUALS.equals(operator)) result = MapStoreCondition.OP_NOTEQUALS;
-        if (OP_IN.equals(operator)) result = MapStoreCondition.OP_IN;
-        if (OP_BETWEEN.equals(operator)) result = MapStoreCondition.OP_BETWEEN;
+        else if (OP_SIMILARITY.equals(operator)) result = MapStoreCondition.OP_SIMILARITY;
+        else if (OP_BIGGERTHAN.equals(operator)) result = MapStoreCondition.OP_BIGGERTHAN;
+        else if (OP_BIGGEROREQUALSTHAN.equals(operator)) result = MapStoreCondition.OP_BIGGEROREQUALSTHAN;
+        else if (OP_LESSTHAN.equals(operator)) result = MapStoreCondition.OP_LESSTHAN;
+        else if (OP_LESSOREQUALSTHAN.equals(operator)) result = MapStoreCondition.OP_LESSOREQUALSTHAN;
+        else if (OP_NOTEQUALS.equals(operator)) result = MapStoreCondition.OP_NOTEQUALS;
+        else if (OP_IN.equals(operator)) result = MapStoreCondition.OP_IN;
+        else if (OP_BETWEEN.equals(operator)) result = MapStoreCondition.OP_BETWEEN;
         else result = MapStoreCondition.OP_RELATED;
         return result;
     }

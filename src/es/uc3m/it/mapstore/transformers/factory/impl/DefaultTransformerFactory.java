@@ -12,8 +12,10 @@ import es.uc3m.it.mapstore.transformers.impl.ArrayTransformer;
 import es.uc3m.it.mapstore.transformers.impl.CollectionTransformer;
 import es.uc3m.it.mapstore.transformers.impl.DefaultTransformer;
 import es.uc3m.it.mapstore.transformers.impl.MapStoreItemTransformer;
+import es.uc3m.it.mapstore.transformers.impl.MapStringTransformer;
 import es.uc3m.it.mapstore.transformers.impl.MapTransformer;
 import es.uc3m.it.mapstore.transformers.impl.StringPropertyTransformer;
+import es.uc3m.it.util.ReflectionUtils;
 import java.util.Collection;
 import java.util.Map;
 
@@ -30,10 +32,13 @@ public class DefaultTransformerFactory implements TransformerFactory {
         else if (o instanceof String) tf = new StringPropertyTransformer();
         else if (o instanceof MapStoreItem) tf = new MapStoreItemTransformer();
         else if (o instanceof Collection) tf = new CollectionTransformer();
-        else if (o instanceof Map) tf = new MapTransformer();
-        else {
-            tf = new DefaultTransformer();
+        else if (o instanceof Map) {
+            Map aux = (Map) o;
+            Class c = ReflectionUtils.determineGenericType(aux.keySet());
+            if (String.class.isAssignableFrom(c)) tf = new MapStringTransformer();
+            else tf = new MapTransformer();
         }
+        else tf = new DefaultTransformer();
         return tf;
     }
 
@@ -45,9 +50,7 @@ public class DefaultTransformerFactory implements TransformerFactory {
         else if (MapStoreItem.class.isAssignableFrom(c)) tf = new MapStoreItemTransformer();
         else if (Collection.class.isAssignableFrom(c)) tf = new CollectionTransformer();
         else if (Map.class.isAssignableFrom(c)) tf = new MapTransformer();
-        else {
-            tf = new DefaultTransformer();
-        }
+        else tf = new DefaultTransformer();
         return tf;
     }
 }

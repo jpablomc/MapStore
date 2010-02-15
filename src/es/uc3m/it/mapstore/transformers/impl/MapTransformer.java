@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import net.sf.cglib.proxy.LazyLoader;
 
 /**
  *
@@ -31,14 +30,19 @@ public class MapTransformer implements MapStoreTransformer<Map> {
 
     @Override
     public MapStoreItem toStore(Map object) throws UnTransformableException {
+        if (String.class.isAssignableFrom(ReflectionUtils.determineGenericType(object.keySet()))) return new MapStringTransformer().toStore(object);
         MapStoreItem item = new MapStoreItem();
         int index = 0;
         for (Object key : object.keySet()) {
             item.setProperty(KEY+index, key);
+            item.setProperty(KEY_TYPE+index, key.getClass().getName());
             item.setProperty(VALUE+index, object.get(key));
+            item.setProperty(VALUE_TYPE+index, object.get(key).getClass().getName());
             index++;        
         }
-        item.setType(object.getClass().getName());
+        if (object.containsKey(MapStoreItem.TYPE)) item.setType((String)object.get(MapStoreItem.TYPE));
+        else item.setType(object.getClass().getName());
+        item.setDataClass(object.getClass().getName());
         item.setExtra(MapStoreItem.ISMAP);
         item.setProperty(KEY_TYPE, ReflectionUtils.determineGenericType(object.keySet()).getName());
         item.setProperty(VALUE_TYPE, ReflectionUtils.determineGenericType(object.values()).getName());
@@ -47,14 +51,15 @@ public class MapTransformer implements MapStoreTransformer<Map> {
 
     @Override
     public Map toObject(MapStoreItem item) {
+        if (item.getProperty(KEY_TYPE) == null) return new MapStringTransformer().toObject(item);
         try {
-            Map map = (Map) Class.forName(item.getType()).newInstance();
+            Map map = (Map) Class.forName(item.getDataClass()).newInstance();
             List<String> properties = getPropertiesToProcess(item);
             for (String prop: properties) {
                 Object key;
                 if (prop.startsWith(MapStoreItem.NONPROCESSABLE)) {
                     String[] tmp = ((String)item.getProperty(prop)).split("_");
-                    Class clazzkey = Class.forName((String)item.getProperty(KEY_TYPE));
+                    Class clazzkey = Class.forName((String)item.getProperty(KEY_TYPE+prop));
                     key = LazyObject.newInstance(Integer.valueOf(tmp[0]), Integer.valueOf(tmp[1]), clazzkey);
                 } else key = item.getProperty(prop);
                 String valueStr = prop.replaceAll(KEY, VALUE);
@@ -64,7 +69,7 @@ public class MapTransformer implements MapStoreTransformer<Map> {
                     //En este caso es una referencia
                     valueStr = prop.replaceAll(KEY, MapStoreItem.NONPROCESSABLE+VALUE);
                     String[] tmp = ((String)item.getProperty(valueStr)).split("_");
-                    Class clazzValue = Class.forName((String)item.getProperty(VALUE_TYPE));
+                    Class clazzValue = Class.forName((String)item.getProperty(VALUE_TYPE+ prop));
                     value = LazyObject.newInstance(Integer.valueOf(tmp[0]), Integer.valueOf(tmp[1]), clazzValue);
                 }
                 map.put(key,value);

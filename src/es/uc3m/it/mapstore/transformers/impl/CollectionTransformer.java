@@ -37,8 +37,13 @@ public class CollectionTransformer implements MapStoreTransformer<Collection<? e
         }
         //Parche para la clase devuelta por Arrays que no es instanciable. Se sustituye por ArrayList que es el tipo que construye
         Class aux = Arrays.asList(new Object[0]).getClass();
-        if (collection.getClass().getName().equals(aux.getName())) item.setType(ArrayList.class.getName());
-        else item.setType(collection.getClass().getName());
+        if (collection.getClass().getName().equals(aux.getName())) {
+            item.setType(ArrayList.class.getName());
+            item.setDataClass(ArrayList.class.getName());
+        } else {
+            item.setType(collection.getClass().getName());
+            item.setDataClass(collection.getClass().getName());
+        }
         item.setProperty(GENERIC_STRING, ReflectionUtils.determineGenericType(collection).getName());
         item.setExtra(MapStoreItem.ISCOLLECTION);
         item.setPrefix(PROP_STRING);
@@ -48,7 +53,7 @@ public class CollectionTransformer implements MapStoreTransformer<Collection<? e
     @Override
     public Collection toObject(MapStoreItem item) {
         //Notese que en tiempode ejecución las colecciones carecen de genericos... por lo que no es necesario devolver el objeto con generico
-        String clazzName = item.getType();
+        String clazzName = item.getDataClass();
         try {
             System.out.println(item.getId() + " - " +clazzName);
             Collection col = (Collection) Class.forName(clazzName).newInstance();

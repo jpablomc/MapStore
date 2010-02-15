@@ -65,7 +65,7 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
         pm = new PersistenceModule();
     }
 
-    private PersistenceManager getPersistanceManager() {
+    private synchronized PersistenceManager getPersistanceManager() {
         PersistenceManager manager = pm.getPersistenceManager();       
         if (manager == null) {
             init();

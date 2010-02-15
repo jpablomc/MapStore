@@ -16,6 +16,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.transaction.HeuristicMixedException;
 import javax.transaction.HeuristicRollbackException;
@@ -66,17 +68,20 @@ public class NeoTransactionManagerWrapper implements TransactionManagerWrapper {
     @Override
     public void rollback() throws IllegalStateException, SecurityException, SystemException {
         tm.getTxManager().rollback();
+        Logger.getLogger(NeoTransactionManagerWrapper.class.getName()).log(Level.INFO,"Rollback Transaccion");
     }
 
     @Override
     public void begin() throws NotSupportedException, SystemException {
         tm.getTxManager().begin();
+        Logger.getLogger(NeoTransactionManagerWrapper.class.getName()).log(Level.INFO,"Se inicia Transaccion");
     }
 
     @Override
     public void commit() throws RollbackException, HeuristicMixedException, HeuristicRollbackException, SecurityException, IllegalStateException, SystemException{
         Transaction t = tm.getTxManager().getTransaction();
         tm.getTxManager().getTransaction().commit();
+        Logger.getLogger(NeoTransactionManagerWrapper.class.getName()).log(Level.INFO,"Commit Transaccion");
     }
 
     @Override

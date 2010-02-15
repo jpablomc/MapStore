@@ -130,4 +130,8 @@ public class TextToNumber {
         throw new NumberFormatException("Not implemented yet");
     }
 
+    public static String toText(long l) {
+        return Long.toString(l);
+    }
+
 }

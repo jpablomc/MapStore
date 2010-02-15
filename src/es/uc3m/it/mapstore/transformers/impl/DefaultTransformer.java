@@ -7,6 +7,7 @@ package es.uc3m.it.mapstore.transformers.impl;
 
 import es.uc3m.it.mapstore.bean.MapStoreItem;
 import es.uc3m.it.mapstore.bean.annotations.Name;
+import es.uc3m.it.mapstore.bean.annotations.Type;
 import es.uc3m.it.mapstore.db.impl.LazyObject;
 import es.uc3m.it.mapstore.transformers.MapStoreTransformer;
 import es.uc3m.it.mapstore.transformers.exception.UnTransformableException;
@@ -33,6 +34,7 @@ public class DefaultTransformer implements MapStoreTransformer<Object>{
         //Recuperamos los atributos
         Field[] attributtes = object.getClass().getDeclaredFields();
         SortedMap<Integer,String> names = new TreeMap<Integer,String>();
+        String type = null;
         for (Field attrib : attributtes) {
             if (Modifier.isStatic(attrib.getModifiers())) continue; //Ignoramos los estaticos
             //Para cada atibuto recuperamos el nombre y el valor
@@ -66,6 +68,10 @@ public class DefaultTransformer implements MapStoreTransformer<Object>{
             if (n != null) {
                 names.put(n.order(),(String)value);
             }
+            Type t = attrib.getAnnotation(Type.class);
+            if (t != null) {
+                type = (String)value;
+            }
         }
         //Procesamos name
         StringBuffer sb = new StringBuffer();
@@ -74,7 +80,9 @@ public class DefaultTransformer implements MapStoreTransformer<Object>{
         }
         item.setName(sb.toString());
         //Procesamos type
-        item.setType(object.getClass().getName());
+        if (type == null) type = object.getClass().getName();
+        item.setType(type);
+        item.setDataClass(object.getClass().getName());
         return item;
     }
 
@@ -82,17 +90,17 @@ public class DefaultTransformer implements MapStoreTransformer<Object>{
     public Object toObject(MapStoreItem item) throws UnTransformableException {
         Class clazz;
         try {
-            clazz = Class.forName(item.getType());
+            clazz = Class.forName(item.getDataClass());
         } catch (ClassNotFoundException ex) {
-            throw new UnTransformableException("Class not found: " + item.getType(),ex);
+            throw new UnTransformableException("Class not found: " + item.getDataClass(),ex);
         }
         Object a;
         try {
             a = clazz.newInstance();
         } catch (InstantiationException ex) {
-            throw new UnTransformableException("Class can not be instantiated: " + item.getType(),ex);
+            throw new UnTransformableException("Class can not be instantiated: " + item.getDataClass(),ex);
         } catch (IllegalAccessException ex) {
-            throw new UnTransformableException("Illegal access: " + item.getType(),ex);
+            throw new UnTransformableException("Illegal access: " + item.getDataClass(),ex);
         }
 
         Field[] fAux = clazz.getDeclaredFields();

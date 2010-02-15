@@ -13,5 +13,5 @@ import es.uc3m.it.mapstore.transformers.MapStoreTransformer;
  */
 public interface TransformerFactory {
     public MapStoreTransformer getFactory(Object o);
-    public MapStoreTransformer getFactory(Class o);
+    public MapStoreTransformer getFactory(Class c);
 }

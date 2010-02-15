@@ -206,6 +206,11 @@ public class DiskConnection extends AbstractConnection {
     }
 
     private void serialize(File f, MapStoreItem toRecord) throws SQLException, IOException {
+        System.out.println("-----------------------------");
+        for (String aux : toRecord.getProperties().keySet()) {
+            System.out.println(aux + ":\t\t" + toRecord.getProperty(aux).toString());
+        }
+        System.out.println("-----------------------------");
         if (getAutoCommit()) {
             ObjectOutput out = new ObjectOutputStream(new FileOutputStream(f));
             out.writeObject(toRecord);

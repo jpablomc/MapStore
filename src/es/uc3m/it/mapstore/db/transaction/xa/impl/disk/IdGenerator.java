@@ -26,6 +26,18 @@ public class IdGenerator {
         lastVersion = new HashMap<Integer,Integer>();
     }
 
+    public synchronized int currentId() {
+        return lastID;
+    }
+
+    public synchronized int currentVersion(int id) {
+        Integer version = lastVersion.get(id);
+        if (version == null) {
+            version = getLastVersion(id);
+        }
+        return version;
+    }
+
     public synchronized int getNewId() {
         int result = lastID++;
         getNewVersion(result);
