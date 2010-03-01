@@ -90,6 +90,7 @@ public abstract class SQLDialect implements MapStoreDialect {
         return sql.replaceAll("%CONDITION%", operator);
     }
 
+    @Override
     public String insertTypeName(long id, String type, String name) {
         return "INSERT INTO NAME(ID,TYPE,NAME) VALUES(" + id + ", '" + type + "', '" + name + "')";
     }
@@ -185,7 +186,7 @@ public abstract class SQLDialect implements MapStoreDialect {
             sql = "SELECT ID,VERSION FROM INTEGERS WHERE %CONDITION% UNION " +
                     "SELECT ID,VERSION FROM LONGS WHERE %CONDITION% UNION " +
                     "SELECT ID,VERSION FROM FLOATS WHERE %CONDITION% UNION " +
-                    "SELECT ID,VERSION FROM DOUBLES WHERE %CONDITION% UNION" +
+                    "SELECT ID,VERSION FROM DOUBLES WHERE %CONDITION% UNION " +
                     "SELECT ID,VERSION FROM INTEGERS_LIST WHERE %CONDITION% UNION " +
                     "SELECT ID,VERSION FROM LONGS_LIST WHERE %CONDITION% UNION " +
                     "SELECT ID,VERSION FROM FLOATS_LIST WHERE %CONDITION% UNION " +
@@ -199,7 +200,7 @@ public abstract class SQLDialect implements MapStoreDialect {
             }
             sql += "SELECT ID,VERSION FROM LONGS WHERE %CONDITION% UNION " + 
                     "SELECT ID,VERSION FROM FLOATS WHERE %CONDITION% UNION " +
-                    "SELECT ID,VERSION FROM DOUBLES WHERE %CONDITION% UNION" +
+                    "SELECT ID,VERSION FROM DOUBLES WHERE %CONDITION% UNION " +
                     "SELECT ID,VERSION FROM LONGS_LIST WHERE %CONDITION% UNION " +
                     "SELECT ID,VERSION FROM FLOATS_LIST WHERE %CONDITION% UNION " +
                     "SELECT ID,VERSION FROM DOUBLES_LIST WHERE %CONDITION%";
@@ -308,7 +309,7 @@ public abstract class SQLDialect implements MapStoreDialect {
         }
         StringBuffer sb = new StringBuffer();
         if (canBeRepresentedAsDate) {
-            sb.append("SELECT ID,VERSION FROM DATES WHERE %CONDITION% UNION").
+            sb.append("SELECT ID,VERSION FROM DATES WHERE %CONDITION% UNION ").
                     append("SELECT ID,VERSION FROM DATES_LIST WHERE %CONDITION%");
         }
         if (canBeRepresentedAsInteger) {
@@ -567,7 +568,7 @@ public abstract class SQLDialect implements MapStoreDialect {
         return sql;
     }
 
-    private String generateInsertorUpdateSQL(long id, long version, String property, long order, Float value, boolean update) {
+    private String generateInsertorUpdateSQLForList(long id, long version, String property, long order, Float value, boolean update) {
         String sql;
         if (!update) {
             sql = "INSERT INTO FLOATS_LIST(ID,VERSION,POSITION,PROPERTY,VALUE) VALUES(" + id + ", " + version + ", " + order + ", '" + property + "', " + value + ")";
@@ -577,7 +578,7 @@ public abstract class SQLDialect implements MapStoreDialect {
         return sql;
     }
 
-    private String generateInsertorUpdateSQL(long id, long version, String property, long order, Double value, boolean update) {
+    private String generateInsertorUpdateSQLForList(long id, long version, String property, long order, Double value, boolean update) {
         String sql;
         if (!update) {
             sql = "INSERT INTO DOUBLES_LIST(ID,VERSION,POSITION,PROPERTY,VALUE) VALUES(" + id + ", " + version + ", " + order + ", '" + property + "', " + value + ")";

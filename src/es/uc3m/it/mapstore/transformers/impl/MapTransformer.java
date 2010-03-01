@@ -35,9 +35,10 @@ public class MapTransformer implements MapStoreTransformer<Map> {
         int index = 0;
         for (Object key : object.keySet()) {
             item.setProperty(KEY+index, key);
-            item.setProperty(KEY_TYPE+index, key.getClass().getName());
+            item.setProperty(KEY_TYPE+index, (key != null)?key.getClass().getName():null);
             item.setProperty(VALUE+index, object.get(key));
-            item.setProperty(VALUE_TYPE+index, object.get(key).getClass().getName());
+            Object v = object.get(key);
+            item.setProperty(VALUE_TYPE+index, (v!= null)?v.getClass().getName():null);
             index++;        
         }
         if (object.containsKey(MapStoreItem.TYPE)) item.setType((String)object.get(MapStoreItem.TYPE));
@@ -57,7 +58,7 @@ public class MapTransformer implements MapStoreTransformer<Map> {
             List<String> properties = getPropertiesToProcess(item);
             for (String prop: properties) {
                 Object key;
-                if (prop.startsWith(MapStoreItem.NONPROCESSABLE)) {
+                if (prop.startsWith(MapStoreItem.NONPROCESSABLE_REFERENCE)) {
                     String[] tmp = ((String)item.getProperty(prop)).split("_");
                     Class clazzkey = Class.forName((String)item.getProperty(KEY_TYPE+prop));
                     key = LazyObject.newInstance(Integer.valueOf(tmp[0]), Integer.valueOf(tmp[1]), clazzkey);
@@ -67,7 +68,7 @@ public class MapTransformer implements MapStoreTransformer<Map> {
                 Object value = item.getProperty(valueStr);
                 if (value == null) {
                     //En este caso es una referencia
-                    valueStr = prop.replaceAll(KEY, MapStoreItem.NONPROCESSABLE+VALUE);
+                    valueStr = prop.replaceAll(KEY, MapStoreItem.NONPROCESSABLE_REFERENCE+VALUE);
                     String[] tmp = ((String)item.getProperty(valueStr)).split("_");
                     Class clazzValue = Class.forName((String)item.getProperty(VALUE_TYPE+ prop));
                     value = LazyObject.newInstance(Integer.valueOf(tmp[0]), Integer.valueOf(tmp[1]), clazzValue);
@@ -92,7 +93,7 @@ public class MapTransformer implements MapStoreTransformer<Map> {
         List<String> properties = new ArrayList<String>();
         for (String property: item.getProperties().keySet()) {
             if (property.startsWith(KEY)) properties.add(property);
-            else if (property.startsWith(MapStoreItem.NONPROCESSABLE + KEY)) properties.add(property);
+            else if (property.startsWith(MapStoreItem.NONPROCESSABLE_REFERENCE + KEY)) properties.add(property);
         }
         return properties;
 

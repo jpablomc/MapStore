@@ -217,6 +217,7 @@ public class LuceneConnection extends AbstractConnection {
     public List<LuceneOperation> getOperations() {
         return operations;
     }
+    
     public final static int CONJUNCTIVE_SEARCH = 0;
     public final static int DISJUNCTIVE_SEARCH = 1;
 
@@ -356,7 +357,7 @@ public class LuceneConnection extends AbstractConnection {
                 ScoreDoc[] sd = td.scoreDocs;
                 IndexReader r = is.getIndexReader();
                 for (int i = 0; i < sd.length; i++) {
-                    Document d = r.document(sd[0].doc);
+                    Document d = r.document(sd[i].doc);
                     Integer id = new Integer(d.getFieldable(MapStoreItem.ID).stringValue());
                     Integer ver = new Integer(d.getFieldable(MapStoreItem.VERSION).stringValue());
                     results.addIdVersion(id.intValue(), ver.intValue());

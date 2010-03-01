@@ -65,11 +65,11 @@ public class MapStoreResult {
 
     private void removeNonCommonId(MapStoreResult other) {
         //Primero eliminamos los ids no comunes
-        Set<Integer> ids1 = this.getIds();
-        Set<Integer> ids2 = other.getIds();
+        Set<Integer> ids1 = new HashSet<Integer>(this.getIds());
+        Set<Integer> ids2 = new HashSet<Integer>(other.getIds());
         ids1.retainAll(ids2); //Estos son los ids comunes... por tanto los que hay que mantener
         //Calculamos el complementario
-        Set<Integer> toRemove = this.getIds();
+        Set<Integer> toRemove = new HashSet<Integer>(this.getIds());
         toRemove.removeAll(ids1);
         for (Integer id : toRemove) {
             results.remove(id);

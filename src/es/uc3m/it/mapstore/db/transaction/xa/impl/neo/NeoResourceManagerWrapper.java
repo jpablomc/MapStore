@@ -104,9 +104,9 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
             manager.relationshipCreate(idRel, relType, id, idRef[0]);
             manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_DATE_START, item.getRecordDate().getTime());
             manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_VERSION_START, item.getVersion());
-            manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_NAME, property);
+            manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_NAME, (property != null)?property:"");
             manager.nodeAddProperty(nextId, NeoPropertyIndex.getNeoPropertyIndexForVersion(item.getVersion()), item.getRecordDate().getTime());
-            item.setProperty(MapStoreItem.NONPROCESSABLE + property, idRef[0]+ "_" + idRef[1]);
+            item.setProperty(MapStoreItem.NONPROCESSABLE_REFERENCE + ((property != null)?property:""), idRef[0]+ "_" + idRef[1]);
         }
     }
 
@@ -348,7 +348,7 @@ public class NeoResourceManagerWrapper extends ResourceManagerlImpl {
                     manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_VERSION_START, item.getVersion());
                     manager.relAddProperty(idRel, NeoPropertyIndex.RELATION_NAME, property);
             }
-            item.setProperty(MapStoreItem.NONPROCESSABLE + property, id2[0]+ "_" + id2[1]);
+            item.setProperty(MapStoreItem.NONPROCESSABLE_REFERENCE + property, id2[0]+ "_" + id2[1]);
             relations.remove(property);
         }
         //Ahora queda anular las relaciones que antes estaban activas y ahora no existen

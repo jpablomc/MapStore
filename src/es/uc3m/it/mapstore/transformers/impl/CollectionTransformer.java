@@ -52,7 +52,7 @@ public class CollectionTransformer implements MapStoreTransformer<Collection<? e
 
     @Override
     public Collection toObject(MapStoreItem item) {
-        //Notese que en tiempode ejecución las colecciones carecen de genericos... por lo que no es necesario devolver el objeto con generico
+        //Notese que en tiempo de ejecución las colecciones carecen de genericos... por lo que no es necesario devolver el objeto con generico
         String clazzName = item.getDataClass();
         try {
             System.out.println(item.getId() + " - " +clazzName);

@@ -338,6 +338,11 @@ public class MapStoreSession implements es.uc3m.it.mapstore.db.MapStoreSession {
     public int[] save(Object o) {
         try {
             MapStoreItem i = MapStoreConfig.getInstance().getTransformerFactory().getFactory(o).toStore(o);
+            MapStoreItem old = findByNameType(i.getName(), i.getType());
+            if (old != null) {
+                if (old.isDeleted()) update(o);
+                else throw new MapStoreRunTimeException("Object already defined");
+            }
             return save(i);
         } catch (UnTransformableException ex) {
             Logger.getLogger(MapStoreSession.class.getName()).log(Level.SEVERE, null, ex);

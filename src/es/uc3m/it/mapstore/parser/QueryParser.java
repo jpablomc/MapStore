@@ -462,11 +462,29 @@ public class QueryParser {
         Pattern p = Pattern.compile(PATTERN_NUMBER);
         Matcher m = p.matcher(predicate);
         if (m.find() && m.start() == 0) {
-            Double d = Double.parseDouble(predicate);
-            toReturn = new Object[]{d,predicate};
+            List<Number> convertedValues = getConvertedNumberForString(predicate);
+            Object[] tmp = new Object[convertedValues.size() +1 ];
+            Object[] aux = convertedValues.toArray();
+            System.arraycopy(aux, 0, tmp, 0, aux.length);
+            tmp[tmp.length-1] = predicate;
+            toReturn = tmp;
         } else toReturn = getObjectForValueWord(predicate);
         return toReturn;
     }
+
+    private static List<Number> getConvertedNumberForString(String predicate) {
+        Double d = Double.parseDouble(predicate);
+        float f = d.floatValue();
+        int i = d.intValue();
+        long l = d.longValue();
+        List<Number> result = new ArrayList<Number>();
+        result.add(d);
+        if (d.equals(new Double(f))) result.add(Float.valueOf(f));
+        if (d.equals(new Double(i))) result.add(Integer.valueOf(i));
+        if (d.equals(new Double(l))) result.add(Long.valueOf(l));
+        return result;
+    }
+
 
     private static Object getObjectForValueWord(String predicate) {
         Object result;

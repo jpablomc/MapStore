@@ -93,10 +93,12 @@ public class DerbyDialect extends SQLDialect{
     @Override
     protected String generateInsertorUpdateSQLForList(long id, long version, String property, long order, Date value, boolean update) {
         String sql;
+        DateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        String valueStr = df.format(value);
         if (!update) {
-            sql = "INSERT INTO INTEGERS_LIST(ID,VERSION,POSITION,PROPERTY,VALUE) VALUES(" + id + ", " + version + ", " + order + ", '" + property + "', " + value + ")";
+            sql = "INSERT INTO DATES_LIST(ID,VERSION,POSITION,PROPERTY,VALUE) VALUES(" + id + ", " + version + ", " + order + ", '" + property + "', '" + valueStr + "')";
         } else {
-            sql = "UPDATE INTEGERS_LIST SET VALUE = " + value + " WHERE ID = " + id + " AND VERSION = " + version + " AND POSITION = " + order + " AND PROPERTY = '" + property + "';";
+            sql = "UPDATE DATES_LIST SET VALUE = '" + value + "' WHERE ID = " + id + " AND VERSION = " + version + " AND POSITION = " + order + " AND PROPERTY = '" + property + "';";
         }
         return sql;
     }

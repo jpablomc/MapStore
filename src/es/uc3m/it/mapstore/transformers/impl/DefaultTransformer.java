@@ -116,9 +116,9 @@ public class DefaultTransformer implements MapStoreTransformer<Object>{
                 //En este caso no es una referencia sino el valor
                 value = item.getProperty(prop);
             } else {
-                if (prop.startsWith(MapStoreItem.NONPROCESSABLE)) {
+                if (prop.startsWith(MapStoreItem.NONPROCESSABLE_REFERENCE)) {
                     //En este caso puede ser una referencia
-                    String aux = prop.substring(MapStoreItem.NONPROCESSABLE.length());
+                    String aux = prop.substring(MapStoreItem.NONPROCESSABLE_REFERENCE.length());
                     f = fields.get(aux);
                     if (f != null) {
                         //En este caso es una referencia cargaremos el proxy

@@ -13,9 +13,6 @@ import es.uc3m.it.util.ReflectionUtils;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  *
@@ -25,6 +22,7 @@ public class MapStringTransformer implements MapStoreTransformer<Map<String, ? e
 
     private final static String PROCESSED = "_processed_";
     private final static String VALUE_TYPE = "_type_value_";
+    private final static String VALUE_TYPE_PROPERTY = "_type_value_property_";
 
     @Override
     public MapStoreItem toStore(Map<String, ? extends Object> object) throws UnTransformableException {
@@ -32,11 +30,11 @@ public class MapStringTransformer implements MapStoreTransformer<Map<String, ? e
         StringBuffer sb = new StringBuffer();
         for (String key : object.keySet()) {
             Object value = object.get(key);
-            if (value != null) {
-                item.setProperty(key, value);
-                item.setProperty(VALUE_TYPE + key, object.get(key).getClass().getName());
-                sb.append(key).append("|");
-            }
+            item.setProperty(key, value);
+            String keyStr = (key != null)?key:"";
+            String clazzName = (value != null)?value.getClass().getName():null;
+            item.setProperty(VALUE_TYPE_PROPERTY + keyStr, clazzName);
+            sb.append(key).append("|");
         }
         if (item.getType() == null) {
             item.setType(object.getClass().getName());
@@ -59,13 +57,13 @@ public class MapStringTransformer implements MapStoreTransformer<Map<String, ? e
             for (String currentProp : item.getProperties().keySet()) {
                 if (props.contains(currentProp)) {
                     map.put(currentProp, item.getProperty(currentProp));
-                } else if (currentProp.startsWith(MapStoreItem.NONPROCESSABLE)) {
+                } else if (currentProp.startsWith(MapStoreItem.NONPROCESSABLE_REFERENCE)) {
                     //Es una referencia
-                    String aux = currentProp.substring(MapStoreItem.NONPROCESSABLE.length()); // Nos quedamos con el nombre original de la propiedad
+                    String aux = currentProp.substring(MapStoreItem.NONPROCESSABLE_REFERENCE.length()); // Nos quedamos con el nombre original de la propiedad
                     if (props.contains(aux)) {
                         //Es una referencia
                         String[] tmp = ((String) item.getProperty(currentProp)).split("_");
-                        Class clazzkey = Class.forName((String) item.getProperty(VALUE_TYPE+aux));
+                        Class clazzkey = Class.forName((String) item.getProperty(VALUE_TYPE_PROPERTY+aux));
                         Object key = LazyObject.newInstance(Integer.valueOf(tmp[0]), Integer.valueOf(tmp[1]), clazzkey);
                         map.put(aux, key);
                     } else {
